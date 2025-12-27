@@ -41,12 +41,13 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
             if (!errorMsg.includes("Tasklist failed") && !errorMsg.includes("PS failed")) {
                  addLog(`Scan Error: ${errorMsg}`, 'ERROR', 'SYSTEM');
             }
-            setProcesses([]); 
+            // Keep previous list if failed to prevent flickering, or empty if critical
+            if (processes.length === 0) setProcesses([]); 
         }
     } else {
         // Fallback visual apenas para navegador
         setProcesses([
-            { name: 'Waiting for Electron Backend...', pid: 0, memory: '0 MB', session: 0 }
+            { name: 'Waiting for Electron Backend...', pid: 0, memory: '0 MB', session: 0, title: 'Simulation Mode' }
         ]);
     }
     
@@ -84,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
     const currentDll = stats.target.dllPath || "Nexus_Internal_Bypass.dll";
     const usingInternal = !stats.target.dllPath;
 
-    addLog(`Initiating Injection -> ${stats.target.process.name} (PID: ${stats.target.process.pid})`, 'INFO', 'KERNEL');
+    addLog(`Initiating Injection -> ${stats.target.process.title || stats.target.process.name} (PID: ${stats.target.process.pid})`, 'INFO', 'KERNEL');
     if (usingInternal) addLog('Payload: Internal Universal Bypass (Auto-Selected)', 'INFO', 'LOADER');
 
     setStats(p => ({ ...p, processStatus: 'ATTACHING' }));
@@ -127,11 +128,12 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
   const selectProcess = (proc: ProcessInfo) => {
     setStats(prev => ({ ...prev, target: { ...prev.target, process: proc } }));
     setShowProcessList(false);
-    addLog(`Target Locked: ${proc.name} [PID: ${proc.pid}]`, 'INFO', 'USER');
+    addLog(`Target Locked: ${proc.title || proc.name} [PID: ${proc.pid}]`, 'INFO', 'USER');
   };
 
   const filteredProcesses = processes.filter(p => 
     p.name.toLowerCase().includes(searchFilter.toLowerCase()) || 
+    (p.title && p.title.toLowerCase().includes(searchFilter.toLowerCase())) ||
     p.pid.toString().includes(searchFilter)
   );
 
@@ -176,7 +178,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                         {stats.target.process ? (
                             <>
                                 <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse" />
-                                <span className="text-white truncate">{stats.target.process.name}</span>
+                                <span className="text-white truncate font-bold">{stats.target.process.title || stats.target.process.name}</span>
                                 <span className="text-zinc-500 text-xs ml-2">({stats.target.process.pid})</span>
                                 {isOsMismatch && (
                                     <div className="ml-auto flex items-center gap-1 text-orange-500" title="Warning: Target is a Windows executable but you are on Unix. Injection may fail without Wine/Proton.">
@@ -197,7 +199,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                         <input 
                         autoFocus
                         className="w-full bg-[#121215] p-3 text-xs border-b border-white/10 outline-none text-white font-mono placeholder:text-zinc-700"
-                        placeholder="Filter processes..."
+                        placeholder="Filter processes (Name or Window Title)..."
                         value={searchFilter}
                         onChange={(e) => setSearchFilter(e.target.value)}
                         />
@@ -207,15 +209,18 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                                 <button
                                 key={proc.pid}
                                 onClick={() => selectProcess(proc)}
-                                className="w-full text-left px-4 py-2.5 text-xs font-mono text-zinc-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors border-b border-white/[0.02] flex justify-between group"
+                                className="w-full text-left px-4 py-3 text-xs font-mono text-zinc-300 hover:bg-blue-600/10 hover:text-blue-400 transition-colors border-b border-white/[0.02] flex justify-between items-center group"
                                 >
-                                <span className="group-hover:translate-x-1 transition-transform text-white">{proc.name}</span>
-                                <span className="opacity-40">{proc.pid}</span>
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="group-hover:translate-x-1 transition-transform text-white font-bold truncate">{proc.title || proc.name}</span>
+                                    {proc.title && <span className="text-[9px] text-zinc-500 group-hover:translate-x-1 transition-transform truncate">{proc.name}</span>}
+                                </div>
+                                <span className="opacity-40 ml-2 shrink-0">{proc.pid}</span>
                                 </button>
                             ))
                         ) : (
                             <div className="p-4 text-center text-[10px] text-zinc-600">
-                                {isScanning ? 'Scanning...' : 'No processes found.'}
+                                {isScanning ? 'Scanning...' : 'No active applications found.'}
                             </div>
                         )}
                         </div>

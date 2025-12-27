@@ -28,7 +28,8 @@ export interface ProcessInfo {
   memory: string;
   session: number;
   path?: string;
-  user?: string; 
+  user?: string;
+  title?: string; // New: Window Title
 }
 
 export interface InjectionTarget {

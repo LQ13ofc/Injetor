@@ -80,41 +80,82 @@ ipcMain.handle('get-processes', async () => {
   return new Promise((resolve, reject) => {
     try {
         if (PLATFORM === 'win32') {
-            exec('tasklist /FO CSV /NH', (err, stdout, stderr) => {
-                if (err || stderr) { 
-                    const msg = err ? err.message : stderr;
-                    console.error("Tasklist error:", msg);
-                    reject(`Tasklist failed: ${msg}`); 
-                    return; 
+            // Updated command: /v for verbose (window titles), /nh for no header
+            // Using a large buffer to ensure we get all output
+            exec('tasklist /v /fo csv /nh', { maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
+                if (err && !stdout) { 
+                    console.error("Tasklist error:", err.message);
+                    reject(`Tasklist failed: ${err.message}`); 
+                    return;
                 }
+                
                 try {
                     const processes = [];
-                    const lines = stdout.split('\r\n');
+                    // CRITICAL FIX: Split by regex to handle \r\n (Windows) and \n (potential buffer conversion or shell quirk)
+                    const lines = stdout.toString().split(/\r?\n/);
+                    
                     for (const line of lines) {
-                        const parts = line.match(/(?:^|",")((?:[^"])*)(?:$|")/g);
-                        if (parts && parts.length > 1) {
-                            const name = parts[0].replace(/"/g, '');
-                            if (name.toLowerCase().endsWith('.exe') && name !== 'svchost.exe') {
-                                processes.push({ name: name, pid: parseInt(parts[1].replace(/"/g, '')), memory: parts[4] ? parts[4].replace(/"/g, '') : 'Unknown' });
+                        if (!line.trim()) continue;
+
+                        // Robust CSV Parsing
+                        const parts = [];
+                        let current = '';
+                        let inQuote = false;
+                        
+                        for (let i = 0; i < line.length; i++) {
+                            const char = line[i];
+                            if (char === '"') { 
+                                inQuote = !inQuote; 
+                            } else if (char === ',' && !inQuote) {
+                                parts.push(current);
+                                current = '';
+                            } else {
+                                current += char;
+                            }
+                        }
+                        parts.push(current);
+
+                        // Tasklist /v CSV indices:
+                        // 0: Image Name, 1: PID, 8: Window Title
+                        if (parts.length >= 9) {
+                            const name = parts[0];
+                            const pid = parseInt(parts[1]);
+                            const memory = parts[4];
+                            const title = parts[8];
+
+                            // Enhanced Filter:
+                            // 1. Must have a PID
+                            // 2. Title must exist and not be a generic "N/A" (or localized equivalent if detectable, but N/A is standard)
+                            // 3. Exclude common system noise if title is present but useless (e.g. Default IME)
+                            const isSystemNoise = name.toLowerCase() === 'svchost.exe' || title === 'Default IME' || title === 'MSCTFIME UI';
+                            const hasWindow = title && title !== 'N/A' && title.trim().length > 0;
+
+                            if (hasWindow && !isSystemNoise) {
+                                processes.push({ 
+                                    name: name, 
+                                    pid: pid, 
+                                    memory: memory,
+                                    title: title 
+                                });
                             }
                         }
                     }
-                    resolve(processes.sort((a, b) => a.name.localeCompare(b.name)));
+                    resolve(processes.sort((a, b) => a.title.localeCompare(b.title)));
                 } catch (parseError) {
+                    console.error("Parse error:", parseError);
                     reject(`Parsing error: ${parseError.message}`);
                 }
             });
         } else {
+            // Linux/Mac implementation remains standard PS
             exec('ps -A -o comm,pid,rss,user', (err, stdout, stderr) => {
-                if (err || stderr) { 
-                    const msg = err ? err.message : stderr;
-                    console.error("PS error:", msg);
-                    reject(`PS failed: ${msg}`);
+                if (err && !stdout) { 
+                    reject(`PS failed: ${err ? err.message : stderr}`);
                     return; 
                 }
                 try {
                     const processes = [];
-                    const lines = stdout.split('\n');
+                    const lines = stdout.toString().split('\n');
                     for (let i = 1; i < lines.length; i++) {
                         const line = lines[i].trim();
                         if (!line) continue;
@@ -124,7 +165,7 @@ ipcMain.handle('get-processes', async () => {
                              const name = pathPart.split('/').pop();
                              const pid = parseInt(parts[1]);
                              const mem = (parseInt(parts[2]) / 1024).toFixed(1) + ' MB';
-                             processes.push({ name, pid, memory: mem });
+                             processes.push({ name, pid, memory: mem, title: name }); 
                         }
                     }
                     resolve(processes.sort((a, b) => a.name.localeCompare(b.name)));
