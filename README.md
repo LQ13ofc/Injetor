@@ -78,8 +78,7 @@ O Flux Core utiliza uma arquitetura híbrida:
 
 1.  **Clone o repositório:**
     ```bash
-    git clone https://github.com/seu-usuario/flux-core-nexus.git
-    cd flux-core-nexus
+    git clone https://github.com/LQ13ofc/Injetor
     ```
 
 2.  **Instale as dependências:**
