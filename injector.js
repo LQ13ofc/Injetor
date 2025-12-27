@@ -65,12 +65,16 @@ class RobloxInjector {
                                     const title = parts[8] === "N/A" ? name : parts[8];
                                     
                                     if (!isNaN(pid)) {
-                                        list.push({ 
-                                            name: name, 
-                                            pid: pid, 
-                                            memory: parts[4],
-                                            title: title
-                                        });
+                                        // Only add processes that have a window title or are specifically known games
+                                        // This filters out background services to keep the list clean but REAL.
+                                        if (parts[8] !== "N/A" || name.toLowerCase().includes("roblox") || name.toLowerCase().includes("minecraft")) {
+                                            list.push({ 
+                                                name: name, 
+                                                pid: pid, 
+                                                memory: parts[4],
+                                                title: title
+                                            });
+                                        }
                                     }
                                 }
                             } else {
@@ -84,16 +88,6 @@ class RobloxInjector {
                             // Skip malformed lines
                         }
                     }
-                }
-
-                // 2. Fallback/Mock Data if list is empty (Crucial for UI testing/Dev)
-                if (list.length === 0) {
-                    list.push(
-                        { name: 'RobloxPlayerBeta.exe', pid: 1234, memory: '450,000 K', title: 'Roblox' },
-                        { name: 'GTA5.exe', pid: 5678, memory: '2,100,000 K', title: 'Grand Theft Auto V' },
-                        { name: 'Notepad.exe', pid: 9999, memory: '12,000 K', title: 'Untitled - Notepad' },
-                        { name: 'Chrome.exe', pid: 4444, memory: '800,000 K', title: 'Google Chrome' }
-                    );
                 }
 
                 // Filter distinct and sort

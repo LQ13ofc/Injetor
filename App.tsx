@@ -8,6 +8,7 @@ import PluginsPanel from './components/PluginsPanel';
 import ConsoleLogs from './components/ConsoleLogs';
 import ScriptHub from './components/ScriptHub';
 import SettingsPanel from './components/SettingsPanel';
+import WindowControls from './components/WindowControls';
 import { AppView, SystemStats, LogEntry, PluginModule, GamePack, AppSettings, Platform } from './types';
 
 // --- UNIVERSAL RUNTIME LIST ---
@@ -245,10 +246,15 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#0d0d0f] text-zinc-100 font-sans overflow-hidden select-none">
+    <div className="flex h-screen bg-[#0d0d0f] text-zinc-100 font-sans overflow-hidden select-none border border-white/5 rounded-xl shadow-2xl">
+      {/* Draggable Title Area */}
+      <div className="absolute top-0 left-0 w-full h-8 titlebar-drag z-50 flex justify-end pr-4 pt-2">
+         <WindowControls />
+      </div>
+
       <Sidebar currentView={currentView} setView={setCurrentView} />
       
-      <main className="flex-1 overflow-y-auto relative custom-scrollbar">
+      <main className="flex-1 overflow-y-auto relative custom-scrollbar pt-8">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 opacity-50" />
         
         {currentView === AppView.DASHBOARD && (

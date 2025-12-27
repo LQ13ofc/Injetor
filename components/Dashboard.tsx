@@ -23,17 +23,28 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
   
   const fetchProcesses = async () => {
     setIsScanning(true);
+    
     if (window.fluxAPI) {
       try {
         const list = await window.fluxAPI.getProcesses();
         if (Array.isArray(list)) {
             setProcesses(list);
-            if(processes.length === 0 && list.length > 0) setShowProcessSelector(true);
+            // If the user hasn't selected a process yet and we found some, prompt selection
+            if(processes.length === 0 && list.length > 0 && !stats.target.process) {
+                // Optional: Don't force open, let user click
+                // setShowProcessSelector(true); 
+            }
         }
       } catch (e) {
-          addLog("Failed to fetch processes", "ERROR", "SYSTEM");
+          addLog("Failed to fetch processes from kernel.", "ERROR", "SYSTEM");
+          setProcesses([]);
       }
+    } else {
+        // We are in browser mode, show nothing or a warning
+        addLog("Browser Mode Detected: Cannot scan real processes.", "WARN", "SYSTEM");
+        setProcesses([]);
     }
+    
     setIsScanning(false);
   };
 
@@ -48,6 +59,9 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
         window.fluxAPI.onPhaseUpdate((phase) => {
             setStats(prev => ({ ...prev, injectionPhase: phase }));
         });
+    } else {
+        // Web Browser Fallback
+        setStats(prev => ({ ...prev, target: { ...prev.target, dllPath: "C:\\Windows\\System32\\flux-core.dll" } }));
     }
     fetchProcesses();
   }, []);
@@ -82,6 +96,13 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
             setStats(p => ({ ...p, processStatus: 'ERROR' }));
             addLog(`Injection Failed: ${result.error}`, 'ERROR', 'INJECTOR');
         }
+    } else {
+        // Browser Simulation
+        setTimeout(() => {
+             setStats(p => ({ ...p, processStatus: 'INJECTED', pipeConnected: true, injectionPhase: 7 }));
+             addLog('Injection Successful (Simulation).', 'SUCCESS', 'KERNEL');
+             setTimeout(onOpenHub, 800);
+        }, 2000);
     }
   };
 
@@ -170,7 +191,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                         <div className="max-h-[200px] overflow-y-auto custom-scrollbar space-y-1">
                             {filteredProcesses.length === 0 ? (
                                 <div className="text-center py-8 text-zinc-600 text-xs italic">
-                                    {isScanning ? 'Scanning system...' : 'No processes found.'}
+                                    {isScanning ? 'Scanning system...' : 'No active windows found.'}
                                 </div>
                             ) : (
                                 filteredProcesses.map(proc => (

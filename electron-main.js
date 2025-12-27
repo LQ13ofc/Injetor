@@ -56,9 +56,12 @@ async function createWindow() {
   await session.defaultSession.clearCache();
   
   mainWindow = new BrowserWindow({
-    width: 1050, height: 680,
+    width: 1280, // Increased size
+    height: 800, // Increased size
+    minWidth: 960, // Minimum prevent breaking layout
+    minHeight: 600,
     frame: false,
-    resizable: false,
+    resizable: true, // Enabled resizing
     backgroundColor: '#0d0d0f',
     title: "Roblox Player", // Fake Title
     icon: path.join(__dirname, 'assets/icon.ico'),
@@ -108,15 +111,20 @@ app.on('window-all-closed', () => {
 
 // --- SECURE IPC HANDLERS ---
 
-// Rate Limiting
-const rateLimits = new Map();
-function checkRateLimit(ip, limit = 500) {
-    const now = Date.now();
-    const last = rateLimits.get(ip) || 0;
-    if (now - last < limit) return false;
-    rateLimits.set(ip, now);
-    return true;
-}
+// Window Controls
+ipcMain.on('window-minimize', () => mainWindow?.minimize());
+ipcMain.on('window-maximize', () => {
+    if (mainWindow?.isMaximized()) {
+        mainWindow.unmaximize();
+    } else {
+        mainWindow?.maximize();
+    }
+});
+ipcMain.on('window-close', () => mainWindow?.close());
+
+// Cache mechanism for processes
+let processCache = [];
+let lastProcessFetch = 0;
 
 // 1. Get Bundled DLL Path (Internal)
 ipcMain.handle('get-bundled-dll', async () => {
@@ -141,10 +149,26 @@ ipcMain.handle('select-file', async () => {
     };
 });
 
-// 3. Get Processes (Sanitized)
+// 3. Get Processes (With Caching)
 ipcMain.handle('get-processes', async () => {
-    if(!checkRateLimit('proc', 2000)) return []; // 2s cache
-    return await RobloxInjector.getProcessList();
+    const now = Date.now();
+    // Return cache if requested within 2 seconds and we have data
+    if (now - lastProcessFetch < 2000 && processCache.length > 0) {
+        return processCache;
+    }
+    
+    const processes = await RobloxInjector.getProcessList();
+    
+    // Only update cache if we got results, otherwise keep old cache to prevent empty UI
+    if (processes.length > 0) {
+        processCache = processes;
+        lastProcessFetch = now;
+    } else if (processCache.length === 0) {
+        // If cache is empty and we got nothing (e.g. startup), return a fallback
+        return []; 
+    }
+    
+    return processCache;
 });
 
 // 4. Inject DLL (Encrypted Payload)

@@ -141,6 +141,12 @@ declare global {
       getProcesses: () => Promise<ProcessInfo[]>;
       selectFile: () => Promise<{ path: string, name: string, size: string } | null>;
       getBundledDLL: () => Promise<string>;
+      
+      // Controls
+      minimize: () => void;
+      toggleMaximize: () => void;
+      close: () => void;
+
       inject: (pid: number, dllPath: string, settings: AppSettings) => Promise<{ success: boolean; error?: string }>;
       executeScript: (script: string) => Promise<{ success: boolean; error?: string }>;
       onLog: (callback: (data: LogEntry) => void) => void;

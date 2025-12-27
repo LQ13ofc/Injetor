@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld('fluxAPI', {
     selectFile: () => ipcRenderer.invoke('select-file'),
     getBundledDLL: () => ipcRenderer.invoke('get-bundled-dll'),
     
+    // Window Controls
+    minimize: () => ipcRenderer.send('window-minimize'),
+    toggleMaximize: () => ipcRenderer.send('window-maximize'),
+    close: () => ipcRenderer.send('window-close'),
+
     inject: async (pid, dllPath, settings) => {
         const payload = encryptPayload({ pid, dllPath, settings });
         return ipcRenderer.invoke('inject-dll', payload);
