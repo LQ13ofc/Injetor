@@ -1,22 +1,22 @@
+
 {
-  "name": "flux-core-nexus",
-  "version": "4.0.0",
+  "name": "flux-core-master",
+  "version": "3.1.0",
   "description": "Flux Core Nexus: Advanced Execution Environment",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
-    "prebuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('dist')) fs.mkdirSync('dist');\"",
     "build:win32": "electron-builder --win --ia32",
     "build:win64": "electron-builder --win --x64",
     "build:linux": "electron-builder --linux --x64",
-    "build:mac": "electron-builder --mac --universal"
+    "build:mac": "electron-builder --mac --arm64",
+    "build:all": "npm run build:win32 && npm run build:win64 && npm run build:linux && npm run build:mac"
   },
   "build": {
     "appId": "com.fluxcore.master",
     "productName": "Flux Core Master",
     "directories": {
-      "output": "dist",
-      "buildResources": "assets"
+      "output": "dist"
     },
     "win": {
       "target": "portable",
@@ -27,25 +27,30 @@
       "category": "Development"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
     },
     "extraResources": [
       {
         "from": "native/",
         "to": "native",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nexus-dev",
+        "repo": "flux-core-updates"
       }
     ]
   },
   "dependencies": {
     "electron-updater": "^6.1.4",
-    "koffi": "^2.8.1",
-    "node-machine-id": "^1.1.12"
+    "ffi-napi": "^4.0.3"
   },
   "devDependencies": {
-    "electron": "^28.1.0",
+    "electron": "^28.0.0",
     "electron-builder": "^24.9.1"
   }
 }
