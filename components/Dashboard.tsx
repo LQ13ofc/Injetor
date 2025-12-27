@@ -24,9 +24,8 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
   const fetchProcesses = async () => {
     if (isScanning) return;
     setIsScanning(true);
-    if ((window as any).require) {
-      const { ipcRenderer } = (window as any).require('electron');
-      const list = await ipcRenderer.invoke('get-processes');
+    if (window.fluxAPI) {
+      const list = await window.fluxAPI.getProcesses();
       if (Array.isArray(list)) setProcesses(list);
     }
     setIsScanning(false);
@@ -34,19 +33,16 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
 
   useEffect(() => {
     fetchProcesses();
-    if ((window as any).require) {
-        const { ipcRenderer } = (window as any).require('electron');
-        ipcRenderer.on('injection-phase-update', (_, phase) => {
+    if (window.fluxAPI) {
+        window.fluxAPI.onPhaseUpdate((phase) => {
             setStats(prev => ({ ...prev, injectionPhase: phase }));
         });
-        return () => { ipcRenderer.removeAllListeners('injection-phase-update'); };
     }
   }, []);
 
   const handleSelectDll = async () => {
-    if ((window as any).require) {
-        const { ipcRenderer } = (window as any).require('electron');
-        const fileData = await ipcRenderer.invoke('select-file');
+    if (window.fluxAPI) {
+        const fileData = await window.fluxAPI.selectFile();
         
         if (fileData && fileData.path) {
             setStats(prev => ({ ...prev, target: { ...prev.target, dllPath: fileData.path } }));
@@ -73,29 +69,24 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
 
     setStats(p => ({ ...p, processStatus: 'ATTACHING', injectionPhase: 0 }));
     
-    if ((window as any).require) {
-        const { ipcRenderer } = (window as any).require('electron');
-        const result = await ipcRenderer.invoke('inject-dll', {
-            pid: stats.target.process.pid,
-            dllPath: stats.target.dllPath,
-            settings: settings
-        });
+    if (window.fluxAPI) {
+        // Enforce stealth delays in UI
+        addLog('Initializing Syscall Interface...', 'INFO', 'INIT');
+        
+        const result = await window.fluxAPI.inject(
+            stats.target.process.pid,
+            stats.target.dllPath,
+            settings
+        );
 
         if (result.success) {
             setStats(p => ({ ...p, processStatus: 'INJECTED', pipeConnected: true }));
-            addLog('Nexus Engine: Entry Point Executed Successfully.', 'SUCCESS', 'KERNEL');
+            addLog('Nexus Engine: Thread Hijack Successful via NTDLL.', 'SUCCESS', 'KERNEL');
             setTimeout(onOpenHub, 1000);
         } else {
             setStats(p => ({ ...p, processStatus: 'ERROR' }));
             addLog(`Injection Aborted: ${result.error}`, 'ERROR', 'INJECTOR');
         }
-    } else {
-        // Web Simulation Mode
-        setTimeout(() => {
-             setStats(p => ({ ...p, processStatus: 'INJECTED', pipeConnected: true }));
-             addLog('WEB MODE: Simulated Injection Successful.', 'SUCCESS', 'KERNEL');
-             setTimeout(onOpenHub, 1000);
-        }, 2000);
     }
   };
 

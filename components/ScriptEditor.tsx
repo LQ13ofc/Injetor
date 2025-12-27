@@ -12,19 +12,18 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ addLog, enabledPlugins }) =
   const [code, setCode] = useState<string>(`print("Hello from Flux Core!")`);
 
   const handleExecute = async () => {
-    if ((window as any).require) {
-      const { ipcRenderer } = (window as any).require('electron');
-      addLog('Sending script payload to pipe...', 'INFO', 'EXEC');
+    if (window.fluxAPI) {
+      addLog('Encrypting and sending payload via Secure Bridge...', 'INFO', 'EXEC');
       
       try {
-        const result = await ipcRenderer.invoke('execute-script', code);
+        const result = await window.fluxAPI.executeScript(code);
         if (result.success) {
             addLog('Script execution acknowledged by kernel.', 'SUCCESS', 'EXEC');
         } else {
             addLog(`Execution Error: ${result.error}`, 'ERROR', 'EXEC');
         }
       } catch (e: any) {
-        addLog(`IPC Bridge Failure: ${e.message || e}`, 'ERROR', 'EXEC');
+        addLog(`Secure Bridge Failure: ${e.message || e}`, 'ERROR', 'EXEC');
       }
     } else {
       addLog('Execution unavailable in web browser mode.', 'ERROR', 'ENV');

@@ -150,10 +150,9 @@ const App: React.FC = () => {
 
       if (!currentTarget || currentStatus === 'INACTIVE' || currentStatus === 'ERROR') return;
 
-      if ((window as any).require) {
+      if (window.fluxAPI) {
         try {
-          const { ipcRenderer } = (window as any).require('electron');
-          const list: any[] = await ipcRenderer.invoke('get-processes');
+          const list = await window.fluxAPI.getProcesses();
           const stillAlive = list.find(p => p.pid === currentTarget.pid);
 
           if (!stillAlive) {
@@ -172,21 +171,16 @@ const App: React.FC = () => {
 
     interval = setInterval(checkProcessHealth, 2000);
 
-    if ((window as any).require) {
-      const { ipcRenderer } = (window as any).require('electron');
-      ipcRenderer.invoke('get-platform').then((p: Platform) => setStats(prev => ({ ...prev, currentPlatform: p })));
+    if (window.fluxAPI) {
+      window.fluxAPI.getPlatform().then((p) => setStats(prev => ({ ...prev, currentPlatform: p })));
       
-      ipcRenderer.on('log-entry', (_: any, data: any) => {
+      window.fluxAPI.onLog((data) => {
         addLog(data.message, data.level, data.category);
       });
     }
 
     return () => {
         clearInterval(interval);
-        if((window as any).require) {
-             const { ipcRenderer } = (window as any).require('electron');
-             ipcRenderer.removeAllListeners('log-entry');
-        }
     };
   }, [addLog]);
 
@@ -208,9 +202,8 @@ const App: React.FC = () => {
                     if (s.id === scriptId) {
                         const newState = !s.enabled;
                         if (newState && s.code) {
-                            if ((window as any).require) {
-                                const { ipcRenderer } = (window as any).require('electron');
-                                ipcRenderer.invoke('execute-script', s.code).then((res: any) => {
+                            if (window.fluxAPI) {
+                                window.fluxAPI.executeScript(s.code).then((res) => {
                                     if(res.success) addLog(`Module '${s.name}' Activated for ${g.name}.`, 'SUCCESS', 'RUNNER');
                                     else addLog(`Module '${s.name}' Failed: ${res.error}`, 'ERROR', 'RUNNER');
                                 });
