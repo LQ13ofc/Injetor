@@ -1,4 +1,5 @@
 
+
 export enum AppView {
   DASHBOARD = 'dashboard',
   EDITOR = 'editor',
@@ -12,15 +13,12 @@ export type LanguageRuntime = 'lua' | 'python' | 'js' | 'csharp' | 'cpp' | 'c' |
 export type Platform = 'win32' | 'linux' | 'darwin' | 'aix' | 'freebsd' | 'openbsd' | 'sunos'; 
 export type ComplexityMode = 'SIMPLE' | 'COMPLEX';
 
-// Métodos de injeção adaptados para Cross-Platform
 export type InjectionMethodType = 
-  | 'LoadLibraryA'        // Win32 Standard
-  | 'LoadLibraryW'        // Win32 Unicode
-  | 'NtCreateThreadEx'    // Win32 Stealth
-  | 'LD_PRELOAD'          // Linux Standard
-  | 'ptrace'              // Linux/Android Debug
-  | 'DYLD_INSERT'         // macOS Standard
-  | 'task_for_pid';       // macOS Kernel
+  | 'ManualMap'           // Ghost Manual Mapper (7 Phases)
+  | 'NtCreateThreadEx'    // Syscall Injection
+  | 'ThreadHijack'        // Stealth Thread Hijacking
+  | 'LoadLibraryA'        // Standard (High Risk)
+  | 'LD_PRELOAD'          // Linux Standard;
 
 export interface ProcessInfo {
   name: string;
@@ -29,7 +27,7 @@ export interface ProcessInfo {
   session: number;
   path?: string;
   user?: string;
-  title?: string; // New: Window Title
+  title?: string;
 }
 
 export interface InjectionTarget {
@@ -39,6 +37,7 @@ export interface InjectionTarget {
 
 export interface SystemStats {
   processStatus: 'INACTIVE' | 'ATTACHING' | 'INJECTED' | 'ERROR';
+  injectionPhase: number; // 0 to 7
   target: InjectionTarget;
   currentPlatform: Platform;
   pipeConnected: boolean;
@@ -64,14 +63,6 @@ export interface PluginModule {
   type?: string;
 }
 
-export interface HWIDProfile {
-  smbios: string;
-  diskId: string;
-  mac: string;
-  gpu: string;
-  arp: string;
-}
-
 export interface SecurityModule {
   id: string;
   label: string;
@@ -83,17 +74,10 @@ export interface SecurityModule {
   platform?: Platform[]; 
 }
 
-export interface NetworkConfig {
-  packetEncryption: boolean;
-  latencySimulation: number;
-}
-
-export interface DMAConfig {
-  enabled: boolean;
-  device: string;
-  firmwareType: string;
-}
-
+/**
+ * AppSettings defines the global configuration state for the application.
+ * Updated to include all fields referenced in App.tsx and SettingsPanel.tsx.
+ */
 export interface AppSettings {
   windowTitleRandomization: boolean;
   autoInject: boolean;
@@ -103,29 +87,44 @@ export interface AppSettings {
   stealthMode: boolean;
   ghostMode: boolean;
   memoryCleaner: boolean;
-  threadPriority: 'NORMAL' | 'HIGH' | 'REALTIME';
+  threadPriority: string;
   memoryBuffer: number;
-  network: NetworkConfig;
-  dma: DMAConfig;
+  network: {
+    packetEncryption: boolean;
+    latencySimulation: number;
+  };
+  dma: {
+    enabled: boolean;
+    device: string;
+    firmwareType: string;
+  };
   antiOBS: boolean;
   kernelPriority: boolean;
   executionStrategy: 'INTERNAL' | 'EXTERNAL';
-}
-
-export interface ScriptParam {
-  id: string;
-  label: string;
-  type: 'slider' | 'number' | 'text';
-  value: any;
-  min?: number;
-  max?: number;
+  manualMapping?: {
+    stripPE: boolean;
+    eraseTraces: boolean;
+    resolveImports: boolean;
+    shellcodeStub: boolean;
+  };
+  bypasses?: {
+    directSyscalls: boolean;
+    vmtHooking: boolean;
+    threadSpoofing: boolean;
+    watchdogSuspend: boolean;
+  };
+  luaEngine?: {
+    aobScan: boolean;
+    bytecodeInjection: boolean;
+    cClosureWrapper: boolean;
+  };
 }
 
 export interface GameScript {
   id: string;
   name: string;
   enabled: boolean;
-  params?: ScriptParam[];
+  params?: any[];
   code?: string;
 }
 
