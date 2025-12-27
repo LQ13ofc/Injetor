@@ -9,9 +9,37 @@ export enum AppView {
 
 export type LanguageRuntime = 'lua' | 'python' | 'js' | 'csharp' | 'cpp' | 'c' | 'auto';
 
+export interface ScriptParam {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'slider';
+  value: string | number;
+  min?: number;
+  max?: number;
+}
+
+export interface GameScript {
+  id: string;
+  name: string;
+  enabled: boolean;
+  params?: ScriptParam[];
+}
+
+export interface GamePack {
+  id: string;
+  name: string;
+  processName: string;
+  engine: string;
+  runtime: LanguageRuntime;
+  bypassMethod: string;
+  scripts: GameScript[];
+  installed: boolean;
+}
+
 export interface SystemStats {
   processStatus: 'INACTIVE' | 'ATTACHING' | 'ACTIVE' | 'ERROR';
   targetProcess: string;
+  detectedGame?: GamePack;
 }
 
 export interface LogEntry {
