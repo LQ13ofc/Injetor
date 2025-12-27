@@ -1,4 +1,3 @@
-
 # 🚀 Flux Core Nexus v4.0 - God Mode Edition
 
 ![Flux Core Banner](https://img.shields.io/badge/Flux_Core-v4.0_God_Mode-blue?style=for-the-badge) ![Status](https://img.shields.io/badge/Status-UNDETECTED-green?style=for-the-badge) ![Platform](https://img.shields.io/badge/Platform-Windows_%7C_Linux_%7C_macOS-lightgrey?style=for-the-badge)
@@ -23,14 +22,36 @@ Este software foi desenvolvido exclusivamente para fins **EDUCACIONAIS** e de pe
 
 ---
 
-## ⚡ Instalação Rápida (Recomendado)
+## ⚡ Instalação Manual
 
-Criamos um script automático que instala **TUDO** que você precisa (Node, Python, Compiladores C++, Dependências) com um clique.
+Como o ambiente requer ferramentas de compilação específicas, siga estes passos no terminal para garantir uma instalação limpa.
 
-1.  **Clone o repositório.**
-2.  **Execute o arquivo `setup.bat`** (localizado na pasta raiz).
-3.  Aguarde o script finalizar (pode demorar alguns minutos para instalar as ferramentas de compilação C++).
-4.  Após finalizar, inicie com `npm start`.
+### 1. Instalar Todas as Dependências
+Execute o comando abaixo na pasta raiz do projeto. Isso baixará o Electron, compiladores nativos e bibliotecas necessárias.
+
+```bash
+npm install
+```
+
+> **Nota:** Se você estiver no Windows e der erro no `ffi-napi`, certifique-se de ter o Python e o Visual Studio Build Tools instalados.
+
+### 2. Iniciar o Sistema (Modo Dev)
+Para abrir a interface e testar o código sem compilar o executável final:
+
+```bash
+npm start
+```
+
+### 3. Gerar Executável (Smart Build)
+Criamos um comando inteligente que detecta automaticamente se você está no Windows, Linux ou Mac e gera o arquivo correto (`.exe`, `.AppImage` ou `.dmg`).
+
+Execute:
+
+```bash
+npm run build:auto
+```
+
+O arquivo final estará na pasta `dist/`.
 
 ---
 
@@ -78,65 +99,6 @@ O Flux Core utiliza uma arquitetura híbrida:
 
 ---
 
-## 📦 Instalação Manual e Build
-
-Se o script automático falhar, siga estes passos:
-
-### Pré-requisitos
-*   Node.js v18+
-*   Python 3.11 (para scripts Python e node-gyp)
-*   Visual Studio Build Tools 2022 (Carga de trabalho: Desenvolvimento para Desktop com C++)
-
-### Passo a Passo
-
-1.  **Clone o repositório:**
-    ```bash
-    git clone https://github.com/seu-usuario/flux-core-nexus.git
-    cd flux-core-nexus
-    ```
-
-2.  **Instale as dependências:**
-    ```bash
-    npm install
-    ```
-
-3.  **Modo de Desenvolvimento (UI Only):**
-    ```bash
-    npm start
-    ```
-    *Isso abrirá a interface Electron. A injeção real será simulada se o driver nativo não for encontrado.*
-
-4.  **Compilar para Produção (.exe):**
-    ```bash
-    npm run build:win32
-    # ou
-    npm run build:all
-    ```
-    O executável estará na pasta `dist/`.
-
----
-
-## 🕹️ Guia de Uso
-
-1.  **Dashboard:**
-    *   O Nexus tentará detectar automaticamente jogos rodando (ex: `RobloxPlayerBeta.exe`).
-    *   Se o jogo for detectado, clique em **"INITIATE BYPASS"**.
-
-2.  **Plugins:**
-    *   Vá até a aba **Plugins**. Ative o runtime correspondente ao jogo (ex: ative `Lua` para Roblox, `Java` para Zomboid).
-    *   Se os plugins não estiverem ativos, a injeção falhará.
-
-3.  **Security Suite:**
-    *   Configure seus métodos de bypass. Recomendamos manter "Anti-Screenshot" e "Driver Unlinking" sempre ativos.
-    *   Use o botão **"SPOOF SYSTEM ID"** antes de abrir qualquer jogo com Anti-Cheat forte (EAC/BattlEye).
-
-4.  **Script Hub / Editor:**
-    *   Use o **Script Hub** (na Dashboard) para ativar cheats prontos.
-    *   Use o **Editor** para escrever ou colar scripts personalizados.
-    *   Clique no botão **✨ (AI Fix)** para usar o Google Gemini para otimizar seu código (requer API Key no `.env`).
-
----
-
 ## ☠️ Riscos Conhecidos
 
 Apesar de nossas tecnologias de "God Mode", nenhum software é 100% indetectável para sempre.
@@ -144,17 +106,6 @@ Apesar de nossas tecnologias de "God Mode", nenhum software é 100% indetectáve
 *   **Risco de Detecção:** Anti-cheats como Vanguard (Valorant) e Ricochet (CoD) operam em nível Kernel (Ring 0). O uso do Nexus contra eles requer configurações de **DMA Hardware** (cartão físico PCIe) para segurança máxima.
 *   **Integridade do Jogo:** Scripts mal escritos podem corromper seu save game ou causar crash no jogo.
 *   **Vírus em Scripts:** Nunca execute scripts (`loadstring` ou `.exe`) de fontes desconhecidas dentro do Nexus. Eles podem conter loggers ou malware.
-
----
-
-## 🤝 Contribuição
-
-Contribuições são bem-vindas para aprimorar a interface ou adicionar novos Game Packs.
-1.  Fork o projeto.
-2.  Crie sua Feature Branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`).
-4.  Push para a Branch (`git push origin feature/AmazingFeature`).
-5.  Abra um Pull Request.
 
 ---
 

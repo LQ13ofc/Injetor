@@ -1,4 +1,3 @@
-
 {
   "name": "flux-core-master",
   "version": "3.1.0",
@@ -10,7 +9,8 @@
     "build:win64": "electron-builder --win --x64",
     "build:linux": "electron-builder --linux --x64",
     "build:mac": "electron-builder --mac --arm64",
-    "build:all": "npm run build:win32 && npm run build:win64 && npm run build:linux && npm run build:mac"
+    "build:all": "npm run build:win32 && npm run build:win64 && npm run build:linux && npm run build:mac",
+    "build:auto": "node -e \"const os=require('os'); const p=os.platform(); const c=p==='win32'?'npm run build:win64':p==='darwin'?'npm run build:mac':'npm run build:linux'; console.log('\\x1b[36m%s\\x1b[0m', 'Flux Core System Detection: ' + p.toUpperCase()); console.log('\\x1b[33m%s\\x1b[0m', 'Starting specific build sequence...'); require('child_process').execSync(c,{stdio:'inherit'});\""
   },
   "build": {
     "appId": "com.fluxcore.master",
@@ -34,7 +34,9 @@
       {
         "from": "native/",
         "to": "native",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "publish": [
