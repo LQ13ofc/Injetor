@@ -1,29 +1,32 @@
 #!/bin/bash
-# setup.sh para macOS
+set -e
 
-# Volta para a raiz
+# Navega para a raiz do projeto
 cd "$(dirname "$0")/.."
 
-echo "--- NEXUS-MAC: AMBIENTE DE EXECUCAO ---"
+echo "====================================================="
+echo "   NEXUS ULTIMATE - macOS BUILDER"
+echo "====================================================="
 
-# Verifica se o Homebrew existe para instalar dependencias
-if ! command -v brew &> /dev/null; then
-    echo "Homebrew nao encontrado. Instale em brew.sh para dependencias nativas."
-else
-    brew install python@3.11
+# 1. Garante a pasta native
+mkdir -p native
+
+# 2. Verifica Xcode Tools (necessário para o ffi-napi)
+if ! xcode-select -p &> /dev/null; then
+    echo "[!] Instalando Xcode Command Line Tools..."
+    xcode-select --install
+    exit 1
 fi
 
+# 3. Instalação e Compilação
 echo "[1/2] Instalando node_modules..."
+rm -rf node_modules
 npm install
 
-# Detecta Arquitetura
-ARCH=$(uname -m)
-if [ "$ARCH" == "arm64" ]; then
-    echo "[2/2] Gerando DMG para Apple Silicon (ARM64)..."
-    npx electron-builder --mac --arm64
-else
-    echo "[2/2] Gerando DMG para Intel (x64)..."
-    npx electron-builder --mac --x64
-fi
+# 4. Build Universal (M1/M2 e Intel)
+echo "[2/2] Gerando DMG..."
+npx electron-builder --mac --universal
 
-echo "--- FINALIZADO ---"
+echo "====================================================="
+echo "   CONCLUIDO!"
+echo "====================================================="
