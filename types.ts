@@ -11,52 +11,30 @@ export enum AppView {
 export type LanguageRuntime = 'lua' | 'python' | 'js' | 'csharp' | 'cpp' | 'c' | 'asm' | 'java' | 'auto';
 export type Platform = 'win32' | 'linux' | 'darwin' | 'arm64';
 export type ComplexityMode = 'SIMPLE' | 'COMPLEX';
-export type ExecutionStrategy = 'INTERNAL' | 'EXTERNAL' | 'KERNEL' | 'DMA_HARDWARE' | 'HYPERVISOR';
+// LoadLibraryW é mais seguro contra ganchos básicos que LoadLibraryA
+export type InjectionMethodType = 'LoadLibraryA' | 'LoadLibraryW' | 'NtCreateThreadEx';
 
-export interface ScriptParam {
-  id: string;
-  label: string;
-  type: 'text' | 'number' | 'slider';
-  value: string | number;
-  min?: number;
-  max?: number;
-}
-
-export interface GameScript {
-  id: string;
+export interface ProcessInfo {
   name: string;
-  enabled: boolean;
-  qolFeatures?: string[];
-  params?: ScriptParam[];
+  pid: number;
+  memory: string;
+  session: number;
+  path?: string;
 }
 
-export interface GamePack {
-  id: string;
-  name: string;
-  processName: string;
-  engine: string;
-  runtime: LanguageRuntime;
-  bypassMethod: string;
-  scripts: GameScript[];
-  installed: boolean;
-  supportedPlatforms: Platform[];
-}
-
-export interface SystemAnalysis {
-  status: 'OPTIMAL' | 'WARNING' | 'CRITICAL';
-  message: string;
-  missingPlugin?: string;
-  bridgeRequired: boolean;
+export interface InjectionTarget {
+  process: ProcessInfo | null;
+  dllPath: string | null;
 }
 
 export interface SystemStats {
-  processStatus: 'INACTIVE' | 'ATTACHING' | 'ACTIVE' | 'ERROR' | 'PANIC' | 'FAIL_SILENT';
-  targetProcess: string;
-  detectedGame?: GamePack;
+  processStatus: 'INACTIVE' | 'ATTACHING' | 'INJECTED' | 'ERROR';
+  target: InjectionTarget;
   currentPlatform: Platform;
-  remoteMode: boolean;
+  pipeConnected: boolean;
   complexity: ComplexityMode;
-  analysis: SystemAnalysis;
+  autoRefreshProcess: boolean;
+  isAdmin: boolean;
 }
 
 export interface LogEntry {
@@ -68,40 +46,12 @@ export interface LogEntry {
 }
 
 export interface PluginModule {
-  id: LanguageRuntime;
+  id: string;
   name: string;
   description: string;
-  type: 'Engine' | 'Wrapper' | 'JIT';
   enabled: boolean;
   version: string;
-}
-
-export interface DMAConfig {
-  enabled: boolean;
-  device: 'LeetDMA' | 'RaptorDMA' | 'Squirrel' | 'Software_Emulated';
-  firmwareType: 'Custom' | 'Generic' | 'Pooled';
-}
-
-export interface NetworkConfig {
-  packetEncryption: boolean;
-  proxyEnabled: boolean;
-  latencySimulation: number; // ms
-}
-
-export interface AppSettings {
-  // General
-  autoInject: boolean;
-  stealthMode: boolean;
-  
-  // Kernel / Security
-  antiOBS: boolean;
-  memoryBuffer: number;
-  kernelPriority: boolean;
-  executionStrategy: ExecutionStrategy;
-  
-  // Advanced Hardware/Net
-  dma: DMAConfig;
-  network: NetworkConfig;
+  type?: string;
 }
 
 export interface HWIDProfile {
@@ -116,8 +66,63 @@ export interface SecurityModule {
   id: string;
   label: string;
   desc: string;
-  lang: LanguageRuntime[];
+  lang: string[];
   active: boolean;
   riskLevel: 'SAFE' | 'RISKY' | 'EXTREME' | 'GOD';
   category: 'MEMORY' | 'KERNEL' | 'NETWORK' | 'HARDWARE';
+}
+
+export interface NetworkConfig {
+  packetEncryption: boolean;
+  latencySimulation: number; // Jitter real
+}
+
+export interface DMAConfig {
+  enabled: boolean;
+  device: string;
+  firmwareType: string;
+}
+
+export interface AppSettings {
+  windowTitleRandomization: boolean;
+  autoInject: boolean;
+  closeOnInject: boolean;
+  debugPrivileges: boolean;
+  injectionMethod: InjectionMethodType;
+  stealthMode: boolean; // Usa NtCreateThreadEx
+  ghostMode: boolean; // Renomeia + Time Stomping
+  memoryCleaner: boolean; // Limpa string do path
+  threadPriority: 'NORMAL' | 'HIGH' | 'REALTIME'; // Prioridade real do processo
+  memoryBuffer: number;
+  network: NetworkConfig;
+  dma: DMAConfig;
+  antiOBS: boolean;
+  kernelPriority: boolean;
+  executionStrategy: 'INTERNAL' | 'EXTERNAL';
+}
+
+export interface ScriptParam {
+  id: string;
+  label: string;
+  type: 'slider' | 'number' | 'text';
+  value: any;
+  min?: number;
+  max?: number;
+}
+
+export interface GameScript {
+  id: string;
+  name: string;
+  enabled: boolean;
+  params?: ScriptParam[];
+}
+
+export interface GamePack {
+  id: string;
+  name: string;
+  processName: string;
+  installed: boolean;
+  engine: string;
+  scripts: GameScript[];
+  bypassMethod: string;
 }

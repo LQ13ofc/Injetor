@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Shield, Cpu, Monitor, Zap, History, Save, Network, HardDrive, Cpu as Chip } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Cpu, Monitor, Zap, History, Save, Network, HardDrive, Cpu as Chip, Ghost, Eraser } from 'lucide-react';
 import { AppSettings, SystemStats } from '../types';
 
 interface SettingsPanelProps {
@@ -41,7 +41,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
       {/* Tabs */}
       <div className="flex items-center gap-2 p-1 bg-[#141417] rounded-xl border border-white/5">
          <TabButton active={activeTab === 'GENERAL'} onClick={() => setActiveTab('GENERAL')} icon={Monitor} label="General" />
-         <TabButton active={activeTab === 'KERNEL'} onClick={() => setActiveTab('KERNEL')} icon={Chip} label="Kernel" />
+         <TabButton active={activeTab === 'KERNEL'} onClick={() => setActiveTab('KERNEL')} icon={Chip} label="Kernel / Thread" />
          <TabButton active={activeTab === 'NETWORK'} onClick={() => setActiveTab('NETWORK')} icon={Network} label="Network" />
          <TabButton active={activeTab === 'DMA'} onClick={() => setActiveTab('DMA')} icon={HardDrive} label="Hardware DMA" />
       </div>
@@ -59,33 +59,41 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
             />
             <SettingItem 
                 label="Stealth Mode" 
-                desc="Enable hardware ID masking and thread cloaking." 
+                desc="Forces NtCreateThreadEx instead of CreateRemoteThread." 
                 active={settings.stealthMode} 
                 onToggle={() => toggleSetting('stealthMode')}
+            />
+            <SettingItem 
+                label="Ghost Injection (File Flux)" 
+                desc="Renames DLL and applies Time Stomping (changes file date) to evade heuristics." 
+                active={settings.ghostMode} 
+                onToggle={() => toggleSetting('ghostMode')}
+                icon={<Ghost size={14} />}
+            />
+            <SettingItem 
+                label="Memory String Cleaner" 
+                desc="Overwrites DLL path in target memory after successful injection." 
+                active={settings.memoryCleaner} 
+                onToggle={() => toggleSetting('memoryCleaner')}
+                icon={<Eraser size={14} />}
             />
             </SettingsSection>
         )}
 
         {/* KERNEL TAB */}
         {activeTab === 'KERNEL' && (
-            <SettingsSection title="Kernel & Advanced Execution" icon={<Chip size={16} className="text-purple-500" />}>
-            <SettingItem 
-                label="Anti-OBS Protection" 
-                desc="Hardware level screenshot/stream blocking (Overlay Hijack)." 
-                active={settings.antiOBS} 
-                onToggle={() => toggleSetting('antiOBS')}
-            />
+            <SettingsSection title="Thread Management" icon={<Chip size={16} className="text-purple-500" />}>
             <SettingItem 
                 label="Realtime Priority Class" 
-                desc="Force bypass process to REALTIME_PRIORITY_CLASS." 
+                desc="Force Flux Core process to REALTIME_PRIORITY_CLASS." 
                 active={settings.kernelPriority} 
                 onToggle={() => toggleSetting('kernelPriority')}
             />
             
             <div className="p-5 border-b border-white/5">
-                <span className="text-xs font-bold text-zinc-300 uppercase italic block mb-3">Execution Strategy</span>
-                <div className="grid grid-cols-3 gap-2">
-                    {['INTERNAL', 'EXTERNAL', 'HYPERVISOR'].map((strat) => (
+                <span className="text-xs font-bold text-zinc-300 uppercase italic block mb-3">Injection Strategy</span>
+                <div className="grid grid-cols-2 gap-2">
+                    {['INTERNAL', 'EXTERNAL'].map((strat) => (
                         <button 
                             key={strat}
                             onClick={() => setSettings(p => ({...p, executionStrategy: strat as any}))}
@@ -95,6 +103,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
                         </button>
                     ))}
                 </div>
+                <p className="mt-2 text-[9px] text-zinc-600">Note: Hypervisor methods require Ring-0 drivers and are not available in user-mode.</p>
             </div>
 
             <div className="p-5 space-y-3">
@@ -120,7 +129,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
             <SettingsSection title="Network Tunneling" icon={<Network size={16} className="text-green-500" />}>
                  <SettingItem 
                     label="Packet Encryption (TLS 1.3)" 
-                    desc="Encrypt all script traffic to remote servers." 
+                    desc="Encrypt all script traffic to remote servers (if supported by script)." 
                     active={settings.network.packetEncryption} 
                     onToggle={() => updateNested('network', 'packetEncryption', !settings.network.packetEncryption)}
                 />
@@ -145,17 +154,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
 
         {/* DMA TAB */}
         {activeTab === 'DMA' && (
-            <SettingsSection title="Hardware DMA Configuration" icon={<HardDrive size={16} className="text-orange-500" />}>
+            <SettingsSection title="External Hardware Config Generator" icon={<HardDrive size={16} className="text-orange-500" />}>
                  <SettingItem 
-                    label="Enable DMA Bridge" 
-                    desc="Use external hardware for memory access (Safe Mode)." 
+                    label="Enable Config Generation" 
+                    desc="Generate JSON configs for external DMA hardware cards." 
                     active={settings.dma.enabled} 
                     onToggle={() => updateNested('dma', 'enabled', !settings.dma.enabled)}
                 />
                 {settings.dma.enabled && (
                     <div className="p-5 space-y-4 bg-orange-500/5">
                         <div className="space-y-2">
-                             <span className="text-[10px] font-bold text-zinc-400 uppercase">Device Type</span>
+                             <span className="text-[10px] font-bold text-zinc-400 uppercase">Target Device</span>
                              <select 
                                 value={settings.dma.device}
                                 onChange={(e) => updateNested('dma', 'device', e.target.value)}
@@ -164,11 +173,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
                                  <option value="LeetDMA">LeetDMA PCIe</option>
                                  <option value="RaptorDMA">RaptorDMA</option>
                                  <option value="Squirrel">Squirrel (Lambda)</option>
-                                 <option value="Software_Emulated">Software Emulated (Dev)</option>
                              </select>
                         </div>
                          <div className="space-y-2">
-                             <span className="text-[10px] font-bold text-zinc-400 uppercase">Firmware Signature</span>
+                             <span className="text-[10px] font-bold text-zinc-400 uppercase">Firmware Signature Profile</span>
                              <select 
                                 value={settings.dma.firmwareType}
                                 onChange={(e) => updateNested('dma', 'firmwareType', e.target.value)}
@@ -179,6 +187,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
                                  <option value="Pooled">Pooled License</option>
                              </select>
                         </div>
+                        <p className="text-[9px] text-orange-400/80 italic">Warning: This app manages configs only. It does not act as a DMA driver itself.</p>
                     </div>
                 )}
             </SettingsSection>
@@ -224,11 +233,14 @@ const SettingsSection: React.FC<{ title: string, icon: React.ReactNode, children
   </div>
 );
 
-const SettingItem: React.FC<{ label: string, desc: string, active: boolean, onToggle: () => void }> = ({ label, desc, active, onToggle }) => (
+const SettingItem: React.FC<{ label: string, desc: string, active: boolean, onToggle: () => void, icon?: React.ReactNode }> = ({ label, desc, active, onToggle, icon }) => (
   <div className="p-5 flex items-center justify-between hover:bg-white/[0.01] transition-colors cursor-pointer" onClick={onToggle}>
-    <div className="space-y-1">
-      <h4 className={`text-xs font-black transition-colors ${active ? 'text-blue-400' : 'text-zinc-300'}`}>{label}</h4>
-      <p className="text-[10px] text-zinc-600 font-medium">{desc}</p>
+    <div className="flex items-start gap-3">
+        {icon && <div className="text-zinc-500 mt-0.5">{icon}</div>}
+        <div className="space-y-1">
+        <h4 className={`text-xs font-black transition-colors ${active ? 'text-blue-400' : 'text-zinc-300'}`}>{label}</h4>
+        <p className="text-[10px] text-zinc-600 font-medium">{desc}</p>
+        </div>
     </div>
     <div className={`w-9 h-4.5 rounded-full relative transition-all ${active ? 'bg-blue-600' : 'bg-zinc-800'}`}>
        <div className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full transition-all ${active ? 'left-5' : 'left-0.5'}`} />
