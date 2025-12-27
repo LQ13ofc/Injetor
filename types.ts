@@ -8,11 +8,19 @@ export enum AppView {
   SETTINGS = 'settings'
 }
 
-export type LanguageRuntime = 'lua' | 'python' | 'js' | 'csharp' | 'cpp' | 'c' | 'asm' | 'java' | 'auto';
+export type LanguageRuntime = 'lua' | 'python' | 'js' | 'csharp' | 'cpp' | 'c' | 'asm' | 'java' | 'rust' | 'ruby' | 'swift' | 'auto';
 export type Platform = 'win32' | 'linux' | 'darwin' | 'arm64';
 export type ComplexityMode = 'SIMPLE' | 'COMPLEX';
-// LoadLibraryW é mais seguro contra ganchos básicos que LoadLibraryA
-export type InjectionMethodType = 'LoadLibraryA' | 'LoadLibraryW' | 'NtCreateThreadEx';
+
+// Métodos de injeção adaptados para Cross-Platform
+export type InjectionMethodType = 
+  | 'LoadLibraryA'        // Win32 Standard
+  | 'LoadLibraryW'        // Win32 Unicode
+  | 'NtCreateThreadEx'    // Win32 Stealth
+  | 'LD_PRELOAD'          // Linux Standard
+  | 'ptrace'              // Linux/Android Debug
+  | 'DYLD_INSERT'         // macOS Standard
+  | 'task_for_pid';       // macOS Kernel
 
 export interface ProcessInfo {
   name: string;
@@ -20,6 +28,7 @@ export interface ProcessInfo {
   memory: string;
   session: number;
   path?: string;
+  user?: string; // Novo: Usuário dono do processo (útil para Linux/Mac)
 }
 
 export interface InjectionTarget {
@@ -70,11 +79,12 @@ export interface SecurityModule {
   active: boolean;
   riskLevel: 'SAFE' | 'RISKY' | 'EXTREME' | 'GOD';
   category: 'MEMORY' | 'KERNEL' | 'NETWORK' | 'HARDWARE';
+  platform?: Platform[]; // Novo: Restrição de OS por módulo
 }
 
 export interface NetworkConfig {
   packetEncryption: boolean;
-  latencySimulation: number; // Jitter real
+  latencySimulation: number;
 }
 
 export interface DMAConfig {
@@ -89,10 +99,10 @@ export interface AppSettings {
   closeOnInject: boolean;
   debugPrivileges: boolean;
   injectionMethod: InjectionMethodType;
-  stealthMode: boolean; // Usa NtCreateThreadEx
-  ghostMode: boolean; // Renomeia + Time Stomping
-  memoryCleaner: boolean; // Limpa string do path
-  threadPriority: 'NORMAL' | 'HIGH' | 'REALTIME'; // Prioridade real do processo
+  stealthMode: boolean;
+  ghostMode: boolean;
+  memoryCleaner: boolean;
+  threadPriority: 'NORMAL' | 'HIGH' | 'REALTIME';
   memoryBuffer: number;
   network: NetworkConfig;
   dma: DMAConfig;
@@ -115,6 +125,7 @@ export interface GameScript {
   name: string;
   enabled: boolean;
   params?: ScriptParam[];
+  code?: string;
 }
 
 export interface GamePack {

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ShieldCheck, Fingerprint, Search, ShieldAlert, Cpu, Terminal, Shield, Network, Radio, HardDrive } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Search, ShieldAlert, Cpu, Terminal, Shield, Network, Radio, HardDrive, Lock } from 'lucide-react';
 import { HWIDProfile, PluginModule, SecurityModule } from '../types';
 
 interface SecuritySuiteProps {
@@ -22,18 +22,29 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
 
   // Módulos que representam o que o app faz ou tenta proteger
   const [securityModules, setSecurityModules] = useState<SecurityModule[]>([
-    { id: 'm1', label: "Memory String Cleaner", desc: "Overwrites DLL path in target memory after load.", lang: ['c', 'cpp'], active: true, riskLevel: 'SAFE', category: 'MEMORY' },
-    { id: 'm2', label: "Ghost File Flux", desc: "Renames DLL to system file names before injection.", lang: ['c', 'cpp'], active: true, riskLevel: 'SAFE', category: 'HARDWARE' },
-    { id: 'm3', label: "NtCreateThreadEx Method", desc: "Uses native API to bypass standard hooks.", lang: ['cpp'], active: true, riskLevel: 'SAFE', category: 'KERNEL' },
-    { id: 'm4', label: "System Trace Cleaner", desc: "Flushes DNS/ARP and reset Winsock stack.", lang: ['c'], active: true, riskLevel: 'SAFE', category: 'NETWORK' },
+    // Universal
+    { id: 'm1', label: "Memory String Cleaner", desc: "Overwrites DLL path in target memory.", lang: ['c', 'cpp'], active: true, riskLevel: 'SAFE', category: 'MEMORY' },
+    { id: 'm4', label: "System Trace Cleaner", desc: "Flushes DNS/ARP and reset Winsock.", lang: ['c'], active: true, riskLevel: 'SAFE', category: 'NETWORK' },
     { id: 'm18', label: "TLS Packet Encryption", desc: "Encrypts script data stream.", lang: ['lua'], active: true, riskLevel: 'SAFE', category: 'NETWORK' },
+    
+    // Windows Specific
+    { id: 'm2', label: "Ghost File Flux", desc: "Renames DLL to system file names.", lang: ['c', 'cpp'], active: true, riskLevel: 'SAFE', category: 'HARDWARE', platform: ['win32'] },
+    { id: 'm3', label: "NtCreateThreadEx", desc: "Syscall to bypass standard hooks.", lang: ['cpp'], active: true, riskLevel: 'SAFE', category: 'KERNEL', platform: ['win32'] },
+    
+    // Linux Specific
+    { id: 'l1', label: "eBPF Trace Blocker", desc: "Prevents kernel tracing via eBPF.", lang: ['c'], active: true, riskLevel: 'RISKY', category: 'KERNEL', platform: ['linux'] },
+    { id: 'l2', label: "ptrace_scope Bypass", desc: "Modifies YAMA ptrace restrictions.", lang: ['c'], active: true, riskLevel: 'EXTREME', category: 'KERNEL', platform: ['linux'] },
+
+    // Mac Specific
+    { id: 'mc1', label: "Gatekeeper Evasion", desc: "Removes quarantine attributes.", lang: ['bash'], active: true, riskLevel: 'RISKY', category: 'HARDWARE', platform: ['darwin'] },
+    { id: 'mc2', label: "SIP Status Monitor", desc: "Checks System Integrity Protection.", lang: ['swift'], active: true, riskLevel: 'SAFE', category: 'KERNEL', platform: ['darwin'] },
   ] as SecurityModule[]);
 
   const toggleModule = (id: string) => {
     setSecurityModules(prev => prev.map(m => {
         if (m.id === id) {
             const newState = !m.active;
-            addLog(`Security Module '${m.label}' ${newState ? 'ENGAGED' : 'DISENGAGED'}`, newState ? 'SUCCESS' : 'WARN', 'SECURITY');
+            addLog(`Module '${m.label}' ${newState ? 'ENGAGED' : 'DISENGAGED'}`, newState ? 'SUCCESS' : 'WARN', 'SECURITY');
             return { ...m, active: newState };
         }
         return m;
@@ -56,7 +67,6 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
     if ((window as any).require) {
         const { ipcRenderer } = (window as any).require('electron');
         try {
-            // Chama a função real no backend
             await ipcRenderer.invoke('system-flush');
             
             setTimeout(() => {
@@ -72,7 +82,7 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
             }, 1000);
         } catch (e) {
             setIsSpoofing(false);
-            addLog('Failed to execute flush commands. Run as Admin.', 'ERROR', 'SECURITY');
+            addLog('Failed to execute flush commands. Run as Admin/Root.', 'ERROR', 'SECURITY');
         }
     } else {
         setIsSpoofing(false);
@@ -104,7 +114,7 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <ShieldCheck className="text-blue-500" size={24} />
-          <h2 className="text-xl font-black text-white tracking-tight uppercase italic">Nexus Security Protocol</h2>
+          <h2 className="text-xl font-black text-white tracking-tight uppercase italic">Universal Security Protocol</h2>
         </div>
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -124,7 +134,7 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
           <div className="flex items-center justify-between mb-6 relative z-10">
             <div className="flex items-center gap-3">
               <Fingerprint className="text-zinc-500" size={18} />
-              <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">Network & Trace Cleaner</span>
+              <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">OpSec & Trace Cleaner</span>
             </div>
             <button onClick={handleSpoof} disabled={isSpoofing} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-900/20">
               {isSpoofing ? 'EXECUTING COMMANDS...' : 'FLUSH TRACES (REAL)'}
@@ -132,19 +142,19 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
           </div>
           <div className="grid grid-cols-2 gap-4 font-mono relative z-10">
             <div className="space-y-1">
-              <span className="text-[9px] text-zinc-600 uppercase">DNS Cache</span>
+              <span className="text-[9px] text-zinc-600 uppercase">System ID</span>
               <div className="bg-black/40 border border-white/5 p-3 rounded-xl text-blue-400 text-xs truncate">{hwid.smbios}</div>
             </div>
             <div className="space-y-1">
-              <span className="text-[9px] text-zinc-600 uppercase">Winsock Catalog</span>
+              <span className="text-[9px] text-zinc-600 uppercase">Interface MAC</span>
               <div className="bg-black/40 border border-white/5 p-3 rounded-xl text-blue-400 text-xs truncate">{hwid.mac}</div>
             </div>
             <div className="space-y-1">
-              <span className="text-[9px] text-zinc-600 uppercase">Temp Files</span>
+              <span className="text-[9px] text-zinc-600 uppercase">Temp Storage</span>
               <div className="bg-black/40 border border-white/5 p-3 rounded-xl text-zinc-400 text-xs truncate">{hwid.diskId}</div>
             </div>
              <div className="space-y-1">
-              <span className="text-[9px] text-zinc-600 uppercase">ARP Table</span>
+              <span className="text-[9px] text-zinc-600 uppercase">Route Table</span>
               <div className="bg-black/40 border border-white/5 p-3 rounded-xl text-green-500/80 text-xs truncate">{hwid.arp}</div>
             </div>
           </div>
@@ -152,20 +162,20 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
 
         <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-white/5 rounded-2xl p-6 flex flex-col justify-center items-center text-center space-y-2 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-          <Radio size={24} className="text-blue-500 animate-pulse relative z-10" />
-          <h3 className="text-xs font-black text-white uppercase italic relative z-10">Active Protection</h3>
-          <p className="text-[9px] text-zinc-500 uppercase tracking-tighter relative z-10">App monitors memory consistency and OpSec protocols.</p>
+          <Lock size={24} className="text-blue-500 animate-pulse relative z-10" />
+          <h3 className="text-xs font-black text-white uppercase italic relative z-10">Stealth Monitor</h3>
+          <p className="text-[9px] text-zinc-500 uppercase tracking-tighter relative z-10">Heuristic analysis of OS signals active.</p>
         </div>
       </div>
 
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between px-1">
-           <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.2em]">Active Modules</h3>
+           <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.2em]">Security Modules</h3>
            <div className="relative group w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-blue-500 transition-colors" size={14} />
             <input 
               type="text" 
-              placeholder="Search..."
+              placeholder="Search bypass..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#111114] border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-xs font-mono text-zinc-400 outline-none focus:border-blue-500/40 transition-all"
@@ -185,9 +195,11 @@ const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins })
                 onClick={() => toggleModule(m.id)}
               >
                  <div className="absolute top-0 right-0 flex">
-                     <div className={`px-2 py-0.5 text-[8px] font-black uppercase bg-black/40 text-zinc-500 border-l border-b border-white/5`}>
-                         {m.category}
-                     </div>
+                     {m.platform && m.platform.map(p => (
+                       <div key={p} className={`px-2 py-0.5 text-[8px] font-black uppercase bg-zinc-900 text-zinc-400 border-l border-b border-white/5`}>
+                         {p}
+                       </div>
+                     ))}
                      <div className={`px-2 py-0.5 text-[8px] font-black rounded-bl-lg ${getRiskColor(m.riskLevel)}`}>
                         {m.riskLevel}
                     </div>

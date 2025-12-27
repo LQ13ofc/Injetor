@@ -16,7 +16,7 @@ const ScriptHub: React.FC<ScriptHubProps> = ({ game, currentPlatform, onClose, o
   const [search, setSearch] = useState('');
   const [expandedScript, setExpandedScript] = useState<string | null>(null);
   
-  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 225, y: 100 });
+  const [position, setPosition] = useState({ x: Math.max(0, window.innerWidth / 2 - 225), y: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
 
@@ -33,9 +33,15 @@ const ScriptHub: React.FC<ScriptHubProps> = ({ game, currentPlatform, onClose, o
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
+      
       const dx = e.clientX - dragRef.current.startX;
       const dy = e.clientY - dragRef.current.startY;
-      setPosition({ x: dragRef.current.initialX + dx, y: dragRef.current.initialY + dy });
+      
+      // Limites da tela
+      const newX = Math.min(Math.max(0, dragRef.current.initialX + dx), window.innerWidth - 450);
+      const newY = Math.min(Math.max(0, dragRef.current.initialY + dy), window.innerHeight - 100);
+
+      setPosition({ x: newX, y: newY });
     };
     
     const handleMouseUp = () => setIsDragging(false);
@@ -58,13 +64,13 @@ const ScriptHub: React.FC<ScriptHubProps> = ({ game, currentPlatform, onClose, o
   return (
     <div 
       style={{ left: position.x, top: position.y }}
-      className={`fixed ${isPinned ? 'z-[9999]' : 'z-[500]'} w-[450px] bg-[#0d0d11]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_40px_100px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 select-none`}
+      className={`fixed ${isPinned || isDragging ? 'z-[9999]' : 'z-[500]'} w-[450px] bg-[#0d0d11]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_40px_100px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 select-none`}
     >
       <div 
         onMouseDown={handleMouseDown}
         className="bg-[#14141a] border-b border-white/5 p-5 flex items-center justify-between cursor-move relative active:cursor-grabbing"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 pointer-events-none">
           <div className="w-10 h-10 bg-blue-600/10 border border-blue-500/20 rounded-xl flex items-center justify-center">
             <Box size={20} className="text-blue-400" />
           </div>
