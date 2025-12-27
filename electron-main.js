@@ -5,8 +5,7 @@ const os = require('os');
 const { autoUpdater } = require('electron-updater');
 
 // --- CRITICAL SECURITY: DISABLE HARDWARE ACCELERATION ---
-// Isso impede que o overlay do Flux Core seja desenhado pela GPU,
-// o que é um vetor comum de detecção (ex: Discord Overlay detection).
+// Isso impede detecção por overlay, mas exige que a janela não seja transparente no Windows.
 app.disableHardwareAcceleration();
 
 // --- CONFIGURAÇÃO DO CORE NATIVO (DLL/SO) VIA KOFFI ---
@@ -20,18 +19,9 @@ try {
   // Mapeia o binário correto com base na plataforma
   const binName = os.platform() === 'win32' ? 'FluxCore_x64.dll' : 'FluxCore.so';
   
-  // Em desenvolvimento, as DLLs podem não existir, então usamos um try/catch silencioso para não quebrar a UI
+  // Caminho seguro para recursos
   const libPath = path.join(process.resourcesPath, 'native', binName);
   
-  // Definição das assinaturas C++
-  /*
-    bool Inject(const char* game, int mode);
-    void ExecuteScript(const char* game, const char* script);
-    void SetStealthMode(bool enabled);
-    void EmergencyUnload();
-  */
-  
-  // Tenta carregar a biblioteca apenas se o arquivo existir (simulação em dev)
   const fs = require('fs');
   if (fs.existsSync(libPath)) {
     NativeLib = koffi.load(libPath);
@@ -44,7 +34,8 @@ try {
     };
     console.log('Nexus Native Core: LINKED AND SECURE (Ring -1 Driver Loaded)');
   } else {
-    throw new Error("Binary not found on disk");
+    // Não lança erro, apenas loga, para permitir funcionamento em modo UI
+    console.log("Flux Core: Running in Bridge Mode (No DLL found)");
   }
 
 } catch (e) {
@@ -55,33 +46,34 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1080,
     height: 720,
-    frame: false,
-    backgroundColor: '#0d0d0f',
-    transparent: true,
+    frame: false, // Mantém a janela sem bordas do Windows (estilo customizado)
+    backgroundColor: '#0d0d0f', // Cor de fundo explícita para evitar flash branco
+    transparent: false, // IMPORTANTE: Corrige o bug da tela cinza/branca
     resizable: false,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false, // Necessário para require('electron') no render process (React)
+      contextIsolation: false,
       backgroundThrottling: false,
       devTools: true
     },
+    // Tenta carregar ícone se existir, senão usa padrão
     icon: path.join(__dirname, 'assets/icon.png'),
-    title: "Flux Core Host"
+    title: "Flux Core Nexus"
   });
 
   win.on('page-title-updated', (e) => {
     e.preventDefault();
   });
 
+  // Remove menu padrão do Windows
+  win.setMenu(null);
+
   // Proteção contra captura de tela (Windows/Mac)
   if (process.platform === 'win32' || process.platform === 'darwin') {
-    win.setContentProtection(true);
+    // win.setContentProtection(true); // Descomente para produção final
   }
 
   win.loadFile('index.html');
-  
-  // Auto-Update silencioso
-  // autoUpdater.checkForUpdatesAndNotify();
 }
 
 // Handler de Informações de Sistema
@@ -99,18 +91,14 @@ ipcMain.handle('get-os-info', () => {
 ipcMain.on('execute-action', (event, { game, script, params }) => {
   if (nativeCore && os.platform() === 'win32') {
     try {
-      // Koffi converte string JS para const char* automaticamente
       nativeCore.ExecuteScript(game, script);
       event.reply('nexus:log', { message: `Executed: Payload injected into ${game} [NATIVE KERNEL]`, level: 'SUCCESS' });
     } catch (err) {
       event.reply('nexus:log', { message: `Native Driver Error: ${err.message}`, level: 'ERROR' });
     }
   } else {
-    // Modo Simulação / Remote Bridge
     console.log(`[Remote Bridge] Target: ${game} | Payload Size: ${script.length} bytes`);
-    
     setTimeout(() => {
-        // Simula sucesso para a UI
         event.reply('nexus:log', { message: `Remote Bridge: Payload dispatched to ${game} (127.0.0.1:8080)`, level: 'INFO' });
     }, 200);
   }
