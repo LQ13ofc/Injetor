@@ -1,18 +1,141 @@
+export enum AppView {
+  DASHBOARD = 'dashboard',
+  EDITOR = 'editor',
+  SECURITY = 'security',
+  PLUGINS = 'plugins',
+  LOGS = 'logs',
+  SETTINGS = 'settings'
+}
 
+export type LanguageRuntime = 'lua' | 'python' | 'js' | 'csharp' | 'cpp' | 'c' | 'asm' | 'java' | 'rust' | 'ruby' | 'swift' | 'auto';
+export type Platform = 'win32' | 'linux' | 'darwin' | 'aix' | 'freebsd' | 'openbsd' | 'sunos'; 
+export type ComplexityMode = 'SIMPLE' | 'COMPLEX';
+
+export type InjectionMethodType = 
+  | 'ManualMap'
+  | 'NtCreateThreadEx'
+  | 'ThreadHijack'
+  | 'LoadLibraryA'
+  | 'LD_PRELOAD';
 
 export enum InjectionMethod {
   MANUAL_MAP = 0,
   PROCESS_HOLLOWING = 1,
   THREAD_HIJACKING = 2,
-  APC_INJECTION = 3
+  APC_INJECTION = 3,
+  NtCreateThreadEx = 4,
+  LoadLibraryA = 5,
+  LD_PRELOAD = 6
 }
 
-export type Platform = 'win32' | 'linux' | 'darwin';
+export interface ProcessInfo {
+  name: string;
+  pid: number;
+  memory: string;
+  session: number;
+  path?: string;
+  user?: string;
+  title?: string;
+}
+
+export interface InjectionTarget {
+  process: ProcessInfo | null;
+  dllPath: string | null;
+}
+
+export interface SystemStats {
+  processStatus: 'INACTIVE' | 'ATTACHING' | 'INJECTED' | 'ERROR';
+  injectionPhase: number;
+  target: InjectionTarget;
+  currentPlatform: Platform;
+  pipeConnected: boolean;
+  complexity: ComplexityMode;
+  autoRefreshProcess: boolean;
+  isAdmin: boolean;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS' | 'CRITICAL';
+  message: string;
+  category: string;
+}
+
+export interface PluginModule {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  version: string;
+  type?: string;
+}
+
+export interface SecurityModule {
+  id: string;
+  label: string;
+  desc: string;
+  lang: string[];
+  active: boolean;
+  riskLevel: 'SAFE' | 'RISKY' | 'EXTREME' | 'GOD';
+  category: 'MEMORY' | 'KERNEL' | 'NETWORK' | 'HARDWARE';
+  platform?: Platform[]; 
+}
+
+export interface AppSettings {
+  windowTitleRandomization: boolean;
+  autoInject: boolean;
+  closeOnInject: boolean;
+  debugPrivileges: boolean;
+  injectionMethod: InjectionMethodType;
+  stealthMode: boolean;
+  ghostMode: boolean;
+  memoryCleaner: boolean;
+  threadPriority: string;
+  memoryBuffer: number;
+  network: {
+    packetEncryption: boolean;
+    latencySimulation: number;
+  };
+  dma: {
+    enabled: boolean;
+    device: string;
+    firmwareType: string;
+  };
+  antiOBS: boolean;
+  kernelPriority: boolean;
+  executionStrategy: 'INTERNAL' | 'EXTERNAL';
+  manualMapping?: {
+    stripPE: boolean;
+    eraseTraces: boolean;
+    resolveImports: boolean;
+    shellcodeStub: boolean;
+  };
+  theme?: 'dark' | 'light';
+}
+
+export interface GameScript {
+  id: string;
+  name: string;
+  enabled: boolean;
+  params?: any[];
+  code?: string;
+}
+
+export interface GamePack {
+  id: string;
+  name: string;
+  processName: string;
+  installed: boolean;
+  engine: string;
+  scripts: GameScript[];
+  bypassMethod: string;
+}
 
 export interface InjectionConfig {
   processName: string;
   dllPath: string;
-  method: InjectionMethod;
+  method: number;
 }
 
 export interface InjectionResult {
@@ -22,35 +145,22 @@ export interface InjectionResult {
   log?: string[];
 }
 
-export interface ProcessInfo {
-  pid: number;
-  name: string;
-  memory: string;
-  title: string;
-  user?: string;
-  path?: string;
-}
-
 export interface FluxAPI {
+  getPlatform: () => Promise<Platform>;
+  getProcesses: () => Promise<ProcessInfo[]>;
+  onLog: (callback: (data: { message: string; level: 'INFO' | 'SUCCESS' | 'ERROR' | 'WARN'; category: string }) => void) => void;
+  getBundledDLL: () => Promise<string>;
+  onPhaseUpdate: (callback: (phase: number) => void) => void;
+  
+  inject(config: InjectionConfig): Promise<InjectionResult>;
+  inject(pid: number, dllPath: string, settings: AppSettings): Promise<{ success: boolean; error?: string }>;
+
+  selectFile: () => Promise<string | null>;
+
+  executeScript: (code: string) => Promise<{ success: boolean; error?: string }>;
   minimize: () => void;
   toggleMaximize: () => void;
   close: () => void;
-  getProcesses: () => Promise<ProcessInfo[]>;
-  
-  // Overloaded inject to support different usage patterns across the app
-  inject(config: InjectionConfig): Promise<InjectionResult>;
-  inject(pid: number, dllPath: string, settings: any): Promise<{ success: boolean; error?: string }>;
-  
-  selectFile: () => Promise<string | null>;
-  
-  // Updated onLog to match object-based log data usage
-  onLog: (callback: (data: { message: string, level: 'INFO' | 'SUCCESS' | 'ERROR' | 'WARN', category: string }) => void) => void;
-  
-  // Added missing methods referenced in components
-  getPlatform: () => Promise<string>;
-  getBundledDLL: () => Promise<string>;
-  onPhaseUpdate: (callback: (phase: number) => void) => void;
-  executeScript: (script: string) => Promise<{ success: boolean; error?: string }>;
-  saveSettings: (settings: any) => Promise<boolean>;
-  loadSettings: () => Promise<any>;
+  saveSettings: (settings: AppSettings) => Promise<boolean>;
+  loadSettings: () => Promise<AppSettings | null>;
 }

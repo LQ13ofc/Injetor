@@ -154,7 +154,8 @@ const App: React.FC = () => {
     dma: { enabled: false, device: 'LeetDMA', firmwareType: 'Custom' },
     antiOBS: true,
     kernelPriority: true,
-    executionStrategy: 'INTERNAL'
+    executionStrategy: 'INTERNAL',
+    theme: 'dark'
   });
 
   const [stats, setStats] = useState<SystemStats>({

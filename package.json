@@ -1,52 +1,23 @@
 {
   "name": "flux-core-nexus",
-  "version": "4.5.0",
-  "description": "Flux Core Nexus: Kernel-Level Execution Environment",
-  "main": "dist/main/index.js",
+  "version": "4.1.0",
+  "main": "dist/electron/main.js",
   "author": "Nexus Dev Team",
   "license": "MIT",
   "scripts": {
-    "clean": "rimraf dist release",
     "dev": "concurrently -n \"VITE,ELECTRON\" -c \"bgBlue,bgMagenta\" \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
-    "build": "npm run clean && npm run build:main && npm run build:preload && npm run build:renderer && electron-builder",
-    "build:main": "tsc -p tsconfig.node.json",
-    "build:preload": "tsc -p tsconfig.node.json --outDir dist/preload src/preload/preload.ts",
-    "build:renderer": "tsc -p tsconfig.json && vite build",
-    "postinstall": "electron-builder install-app-deps",
+    "build": "npm run clean && npm run type-check && npm run build:renderer && npm run build:electron && npm run package",
+    "clean": "rimraf dist release",
+    "type-check": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "package": "electron-builder",
+    "postinstall": "electron-builder install-app-deps && npm run rebuild:koffi",
     "rebuild:koffi": "electron-rebuild -f -w koffi",
-    "typecheck": "tsc --noEmit"
-  },
-  "build": {
-    "appId": "com.fluxcore.nexus",
-    "productName": "Flux Core Nexus",
-    "asar": true,
-    "directories": {
-      "output": "release",
-      "buildResources": "assets"
-    },
-    "files": [
-      "dist/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico",
-      "requestedExecutionLevel": "requireAdministrator"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
-    },
-    "linux": {
-      "target": "AppImage",
-      "category": "Development"
-    },
-    "mac": {
-      "target": "dmg"
-    }
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
   "dependencies": {
     "electron-updater": "^6.1.8",
@@ -56,21 +27,23 @@
     "lucide-react": "^0.300.0"
   },
   "devDependencies": {
-    "electron": "^28.2.0",
-    "electron-builder": "^24.9.1",
-    "electron-rebuild": "^3.2.9",
-    "rimraf": "^5.0.5",
-    "vite": "^5.0.12",
-    "@vitejs/plugin-react": "^4.2.1",
-    "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0",
-    "typescript": "^5.3.3",
+    "@types/node": "^20.11.5",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "@types/node": "^20.11.5",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5",
+    "rimraf": "^5.0.5",
     "tailwindcss": "^3.4.1",
     "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.35"
+    "postcss": "^8.4.35",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "wait-on": "^7.2.0"
   }
 }
