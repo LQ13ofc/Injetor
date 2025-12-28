@@ -31,6 +31,26 @@ class RobloxInjector {
         }
     }
 
+    // New: Check for known Anti-Cheat drivers or processes
+    async detectAntiCheat(pid: number): Promise<string[]> {
+        return new Promise((resolve) => {
+            const detectedAC: string[] = [];
+            // Basic process check for Hyperion/Byfron services (Stub logic)
+            // In a real scenario, this would check drivers in C:\Windows\System32\drivers
+            const acProcesses = ['ByfronService.exe', 'EasyAntiCheat.exe', 'BattlEye.exe'];
+            
+            const cmd = process.platform === 'win32' ? 'tasklist /NH' : 'ps -A';
+            exec(cmd, (err, stdout) => {
+                if (stdout) {
+                    acProcesses.forEach(ac => {
+                        if (stdout.includes(ac)) detectedAC.push(ac);
+                    });
+                }
+                resolve(detectedAC);
+            });
+        });
+    }
+
     async getProcessList(): Promise<any[]> {
         return new Promise((resolve) => {
             const cmd = process.platform === 'win32' 
@@ -74,9 +94,16 @@ class RobloxInjector {
     }
 
     async inject(pid: number, dllPath: string): Promise<{success: boolean, error?: string}> {
+        const acList = await this.detectAntiCheat(pid);
+        if (acList.length > 0) {
+            console.warn(`Anti-Cheat Detected: ${acList.join(', ')}. Aborting unsafe injection.`);
+            return { success: false, error: `AC Detected: ${acList[0]}` };
+        }
+
         if (!nativeAvailable) {
             // Simulation Mode
-            return new Promise(resolve => setTimeout(() => resolve({ success: true }), 1000));
+            console.log("Simulation: Injecting into PID " + pid);
+            return new Promise(resolve => setTimeout(() => resolve({ success: true }), 1500));
         }
         
         if (!fs.existsSync(dllPath)) return { success: false, error: "DLL not found" };

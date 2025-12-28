@@ -12,6 +12,7 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      external: ['electron'],
       input: path.join(__dirname, 'src/renderer/index.html'),
       output: {
         entryFileNames: 'assets/[name].js',

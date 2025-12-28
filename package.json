@@ -7,7 +7,7 @@
   "author": "Nexus Dev Team",
   "license": "MIT",
   "scripts": {
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "electron-builder install-app-deps && electron-rebuild",
     "clean": "rimraf dist release",
     "dev": "concurrently \"npm:dev:vite\" \"npm:dev:electron\"",
     "dev:vite": "vite",
@@ -60,6 +60,7 @@
   "devDependencies": {
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
     "rimraf": "^6.0.1",
     "vite": "^5.0.0",
     "@vitejs/plugin-react": "^4.2.0",

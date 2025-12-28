@@ -42,6 +42,20 @@ async function createWindow() {
 
   mainWindow.setContentProtection(true);
 
+  // CRITICAL SECURITY: Prevent navigation to external sites
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+      if (url !== mainWindow?.webContents.getURL()) {
+          event.preventDefault();
+          console.warn(`Blocked navigation to: ${url}`);
+      }
+  });
+
+  // CRITICAL SECURITY: Block new window creation (e.g., target="_blank")
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      console.warn(`Blocked new window: ${url}`);
+      return { action: 'deny' };
+  });
+
   if (isDev) {
     await mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
