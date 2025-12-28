@@ -11,8 +11,6 @@ let nativeAvailable = false;
 declare const require: any;
 
 try {
-    // We use require here to avoid webpack bundling issues if we were using webpack, 
-    // but in this setup tsc handles it.
     koffi = require('koffi');
     nativeAvailable = process.platform === 'win32';
 } catch (e) {
@@ -39,7 +37,7 @@ class InjectorService {
 
         ipcMain.handle('get-bundled-dll', () => {
             // Check resourcesPath (production) or local assets (dev)
-            const prodPath = path.join(process.resourcesPath, 'assets', 'flux-core-engine.dll');
+            const prodPath = path.join(process.resourcesPath || app.getAppPath(), 'resources', 'assets', 'flux-core-engine.dll');
             return prodPath;
         });
 
@@ -70,6 +68,13 @@ class InjectorService {
                                         list.push({ name, pid, title, path: name });
                                     }
                                 }
+                            } else {
+                                const parts = line.trim().split(/\s+/);
+                                if (parts.length >= 2) {
+                                    const name = parts[0];
+                                    const pid = parseInt(parts[1]);
+                                    list.push({ name, pid, title: name, path: name });
+                                }
                             }
                         } catch (e) {}
                     }
@@ -81,7 +86,10 @@ class InjectorService {
     }
 
     async inject(pid: number, dllPath: string) {
-        if (!fs.existsSync(dllPath)) return { success: false, error: "DLL not found" };
+        if (!fs.existsSync(dllPath)) {
+            // In simulation, we might not have the file, proceed if dev
+            if (nativeAvailable) return { success: false, error: "DLL not found" };
+        }
         console.log(`Injecting into PID ${pid}...`);
         
         // Simulation of native injection for stability in non-native environments
