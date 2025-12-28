@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Fingerprint, Search, Cpu, Terminal, Shield, Network, HardDrive, Lock, Code } from 'lucide-react';
+import { ShieldCheck, Lock } from 'lucide-react';
 import { SecurityModule, PluginModule } from '../types';
 
 interface SecuritySuiteProps {
@@ -7,7 +7,7 @@ interface SecuritySuiteProps {
   enabledPlugins: PluginModule[];
 }
 
-const SecuritySuite: React.FC<SecuritySuiteProps> = ({ addLog, enabledPlugins }) => {
+const SecuritySuite: React.FC<SecuritySuiteProps> = () => {
   const [securityModules, setSecurityModules] = useState<SecurityModule[]>([
     { id: 'p1', label: "Polymorphic Mutation", desc: "Randomizes assembly instructions (MOV -> PUSH/POP) every 60s.", lang: ['asm'], active: true, riskLevel: 'GOD', category: 'KERNEL' },
     { id: 'p2', label: "Call Stack Spoofing", desc: "Hides execution origin by spoofing return addresses.", lang: ['cpp'], active: true, riskLevel: 'GOD', category: 'KERNEL' },

@@ -7,7 +7,7 @@ interface ScriptEditorProps {
   enabledPlugins: PluginModule[];
 }
 
-const ScriptEditor: React.FC<ScriptEditorProps> = ({ addLog, enabledPlugins }) => {
+const ScriptEditor: React.FC<ScriptEditorProps> = ({ addLog }) => {
   const [code, setCode] = useState<string>(`print("Hello from Flux Core!")`);
 
   const handleExecute = async () => {
