@@ -74,6 +74,7 @@ export interface SecurityModule {
 }
 
 export interface AppSettings {
+  theme: 'dark' | 'light';
   windowTitleRandomization: boolean;
   autoInject: boolean;
   closeOnInject: boolean;
@@ -137,6 +138,8 @@ export interface FluxAPI {
     close: () => void;
     inject: (pid: number, dllPath: string, settings: AppSettings) => Promise<{ success: boolean; error?: string }>;
     executeScript: (script: string) => Promise<{ success: boolean; error?: string }>;
+    saveSettings: (settings: AppSettings) => Promise<boolean>;
+    loadSettings: () => Promise<AppSettings | null>;
     onLog: (callback: (data: LogEntry) => void) => void;
     onPhaseUpdate: (callback: (phase: number) => void) => void;
     version: string;

@@ -23,6 +23,14 @@ contextBridge.exposeInMainWorld('fluxAPI', {
         return ipcRenderer.invoke('execute-script', payload);
     },
     
+    // Settings Persistence
+    saveSettings: async (settings: AppSettings) => {
+        return ipcRenderer.invoke('save-settings', settings);
+    },
+    loadSettings: async () => {
+        return ipcRenderer.invoke('load-settings');
+    },
+
     // Listeners
     onLog: (callback: (data: LogEntry) => void) => {
         ipcRenderer.on('log-entry', (_, data) => callback(data));

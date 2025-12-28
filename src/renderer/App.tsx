@@ -9,7 +9,7 @@ import ConsoleLogs from './components/ConsoleLogs';
 import ScriptHub from './components/ScriptHub';
 import SettingsPanel from './components/SettingsPanel';
 import WindowControls from './components/WindowControls';
-import { AppView, SystemStats, LogEntry, PluginModule, GamePack, AppSettings, Platform } from '../types';
+import { AppView, SystemStats, LogEntry, PluginModule, GamePack, AppSettings } from '../types';
 
 // Initial Data Definitions
 const INITIAL_RUNTIMES: PluginModule[] = [
@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
 
   const [settings, setSettings] = useState<AppSettings>({
+    theme: 'dark',
     windowTitleRandomization: true,
     autoInject: false,
     closeOnInject: false,
@@ -71,6 +72,23 @@ const App: React.FC = () => {
 
   const statsRef = useRef(stats);
   useEffect(() => { statsRef.current = stats; }, [stats]);
+
+  // Load Settings on Start
+  useEffect(() => {
+    if (window.fluxAPI) {
+      window.fluxAPI.loadSettings().then((saved) => {
+        if (saved) {
+          setSettings(saved);
+          addLog('Configuration loaded from disk.', 'INFO', 'SYSTEM');
+        }
+      });
+    }
+  }, []);
+
+  // Theme Application
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', settings.theme);
+  }, [settings.theme]);
 
   const addLog = useCallback((msg: string, level: 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS' | 'CRITICAL' = 'INFO', cat: string = 'SYSTEM') => {
     const newLog: LogEntry = {
@@ -120,7 +138,7 @@ const App: React.FC = () => {
   }, [addLog]);
 
   return (
-    <div className="flex h-screen bg-[#0d0d0f] text-zinc-100 font-sans overflow-hidden select-none border border-white/5 rounded-xl shadow-2xl">
+    <div className="flex h-screen bg-main text-content font-sans overflow-hidden select-none border border-border-dim rounded-xl shadow-2xl transition-colors duration-300">
       <div className="absolute top-0 left-0 w-full h-8 titlebar-drag z-50 flex justify-end pr-4 pt-2">
          <WindowControls />
       </div>
@@ -162,7 +180,7 @@ const App: React.FC = () => {
           <ConsoleLogs logs={logs} clearLogs={() => setLogs([])} />
         )}
         {currentView === AppView.SETTINGS && (
-          <SettingsPanel settings={settings} setSettings={setSettings} stats={stats} />
+          <SettingsPanel settings={settings} setSettings={setSettings} stats={stats} addLog={addLog} />
         )}
       </main>
 

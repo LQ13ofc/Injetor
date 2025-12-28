@@ -1,8 +1,10 @@
-
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import crypto from 'crypto';
 import './ipc-handlers';
+
+// Fix TS errors for __dirname
+declare const __dirname: string;
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -76,7 +78,7 @@ async function createWindow() {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if ((process as any).platform !== 'darwin') app.quit();
 });
 
 export { mainWindow };
