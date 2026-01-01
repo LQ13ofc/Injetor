@@ -1,10 +1,9 @@
-
 import React, { useEffect, useRef } from 'react';
 import { Terminal } from 'lucide-react';
-import { useInjection } from '../context/InjectionContext';
+import { useApp } from '../../context/AppContext';
 
 const ConsolePanel: React.FC = () => {
-  const { logs } = useInjection();
+  const { logs } = useApp();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,16 +21,16 @@ const ConsolePanel: React.FC = () => {
             {logs.length === 0 && (
                 <div className="text-gray-600 italic">Waiting for injection command...</div>
             )}
-            {logs.map((log, i) => (
-                <div key={i} className="flex gap-3 hover:bg-white/[0.02] p-0.5 rounded">
-                    <span className="text-gray-600 select-none">[{log.time}]</span>
+            {logs.map((log) => (
+                <div key={log.id} className="flex gap-3 hover:bg-white/[0.02] p-0.5 rounded">
+                    <span className="text-gray-600 select-none">[{log.timestamp}]</span>
                     <span className={`${
-                        log.type === 'SUCCESS' ? 'text-green-400' :
-                        log.type === 'ERROR' ? 'text-red-400' :
-                        log.type === 'WARN' ? 'text-yellow-400' :
+                        log.level === 'SUCCESS' ? 'text-green-400' :
+                        log.level === 'ERROR' ? 'text-red-400' :
+                        log.level === 'WARN' ? 'text-yellow-400' :
                         'text-cyan-200'
                     } break-all`}>
-                        {log.msg}
+                        {log.message}
                     </span>
                 </div>
             ))}

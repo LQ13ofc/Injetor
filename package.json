@@ -16,8 +16,7 @@
     "package": "electron-builder",
     "postinstall": "electron-builder install-app-deps && npm run rebuild:koffi",
     "rebuild:koffi": "electron-rebuild -f -w koffi",
-    "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
     "electron-updater": "^6.1.8",

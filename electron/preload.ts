@@ -9,8 +9,11 @@ const api = {
   // Sistema e Injeção
   getProcesses: () => ipcRenderer.invoke('get-processes'),
   getBundledDLL: () => ipcRenderer.invoke('get-bundled-dll'),
+  
+  // Envia configurações completas para o backend decidir a estratégia
   inject: (pid: number, dllPath: string, settings: any) => 
     ipcRenderer.invoke('inject-dll', { pid, dllPath, settings }),
+    
   executeScript: (code: string) => ipcRenderer.invoke('execute-script', code),
 
   // Watchdog
@@ -21,6 +24,8 @@ const api = {
   // Eventos de Engine
   onPhaseUpdate: (callback: (phase: number) => void) => 
     ipcRenderer.on('injection-phase-update', (_, phase) => callback(phase)),
+    
+  selectFile: async () => null // Removido dialog nativo por simplicidade, usando lógica automática
 };
 
 contextBridge.exposeInMainWorld('fluxAPI', api);
