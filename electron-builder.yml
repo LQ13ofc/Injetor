@@ -8,28 +8,21 @@ directories:
 
 files:
   - dist/**/*
-  - resources/**/*
   - package.json
   - '!**/*.map'
-  - '!**/.DS_Store'
 
 extraResources:
-  - from: resources
-    to: resources
-    filter: '**/*'
+  - from: resources/assets
+    to: assets
+    filter: 
+      - flux-core-engine.dll
 
 win:
   target:
     - target: nsis
-      arch:
-        - x64
-    - target: portable
-      arch:
-        - x64
+      arch: [x64]
   icon: resources/icon.ico
   requestedExecutionLevel: requireAdministrator
-  artifactName: '${productName}-${version}-Setup.${ext}'
-  publisherName: Nexus Dev Team
 
 nsis:
   oneClick: false
@@ -37,20 +30,6 @@ nsis:
   allowElevation: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
-  createStartMenuShortcut: true
-  shortcutName: ${productName}
-  installerIcon: resources/icon.ico
-  uninstallerIcon: resources/icon.ico
-  license: LICENSE
-
-portable:
-  artifactName: '${productName}-${version}-Portable.${ext}'
 
 asar: true
-asarUnpack:
-  - '**/*.node'
-  - 'resources/**/*'
-
 compression: maximum
-
-publish: null

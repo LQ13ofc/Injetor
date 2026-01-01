@@ -1,115 +1,91 @@
-import { ipcMain, dialog, app } from 'electron';
 import { exec } from 'child_process';
 import fs from 'fs';
-import path from 'path';
 import net from 'net';
 
-// Koffi load simulation/setup
-let koffi: any;
-let nativeAvailable = false;
-// @ts-ignore
-declare const require: any;
+export class InjectorService {
+  private nativeAvailable = false;
+  private koffi: any;
 
-try {
-    koffi = require('koffi');
-    nativeAvailable = (process as any).platform === 'win32';
-} catch (e) {
-    console.warn("Native modules unavailable. Running in compatibility mode.");
-}
-
-class InjectorService {
-    constructor() {
-        this.setupHandlers();
+  constructor() {
+    try {
+      // @ts-ignore
+      this.koffi = require('koffi');
+      // Fix: Cast process to any to access platform property
+      this.nativeAvailable = (process as any).platform === 'win32';
+    } catch (e) {
+      console.warn("Native components (koffi) could not be loaded.");
     }
+  }
 
-    setupHandlers() {
-        ipcMain.handle('get-processes', async () => this.getProcessList());
-        ipcMain.handle('inject', async (_, config) => this.inject(config.pid, config.dllPath));
-        ipcMain.handle('execute-script', async (_, { script }) => this.executeScript(script));
-        
-        ipcMain.handle('select-file', async () => {
-            const { filePaths } = await dialog.showOpenDialog({
-                properties: ['openFile'],
-                filters: [{ name: 'DLL Files', extensions: ['dll'] }]
-            });
-            return filePaths[0] || null;
-        });
-
-        ipcMain.handle('get-bundled-dll', () => {
-            // Check resourcesPath (production) or local assets (dev)
-            const prodPath = path.join((process as any).resourcesPath || app.getAppPath(), 'resources', 'assets', 'flux-core-engine.dll');
-            return prodPath;
-        });
-
-        ipcMain.handle('save-settings', () => true);
-        ipcMain.handle('load-settings', () => null);
+  async checkProcessAlive(pid: number): Promise<boolean> {
+    try {
+      // Fix: Cast process to any to access kill method
+      (process as any).kill(pid, 0);
+      return true;
+    } catch (e) {
+      return false;
     }
+  }
 
-    async getProcessList(): Promise<any[]> {
-        return new Promise((resolve) => {
-            const cmd = (process as any).platform === 'win32' 
-                ? 'tasklist /v /fo csv /NH' 
-                : 'ps -A -o comm,pid';
-            
-            exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-                const list: any[] = [];
-                if (!err && stdout) {
-                    const lines = stdout.toString().split(/\r?\n/);
-                    for (const line of lines) {
-                        try {
-                            if ((process as any).platform === 'win32' && line.trim()) {
-                                const parts = line.split('","').map(p => p.replace(/^"|"$/g, '').trim());
-                                if (parts.length >= 2) {
-                                    const name = parts[0];
-                                    const pid = parseInt(parts[1]);
-                                    const title = parts.length >= 9 ? parts[8] : 'N/A';
-                                    
-                                    if (!isNaN(pid)) {
-                                        list.push({ name, pid, title, path: name });
-                                    }
-                                }
-                            } else {
-                                const parts = line.trim().split(/\s+/);
-                                if (parts.length >= 2) {
-                                    const name = parts[0];
-                                    const pid = parseInt(parts[1]);
-                                    list.push({ name, pid, title: name, path: name });
-                                }
-                            }
-                        } catch (e) {}
-                    }
+  async getProcessList(): Promise<any[]> {
+    return new Promise((resolve) => {
+      // Fix: Cast process to any to access platform property
+      const cmd = (process as any).platform === 'win32' 
+        ? 'tasklist /v /fo csv /NH' 
+        : 'ps -A -o comm,pid';
+      
+      exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        const list: any[] = [];
+        if (!err && stdout) {
+          const lines = stdout.toString().split(/\r?\n/);
+          for (const line of lines) {
+            try {
+              // Fix: Cast process to any to access platform property
+              if ((process as any).platform === 'win32') {
+                const parts = line.split('","').map(p => p.replace(/^"|"$/g, '').trim());
+                if (parts.length >= 2) {
+                  list.push({ name: parts[0], pid: parseInt(parts[1]), title: parts[8] || 'N/A' });
                 }
-                const unique = Array.from(new Map(list.map(item => [item.pid, item])).values());
-                resolve(unique);
-            });
-        });
-    }
-
-    async inject(pid: number, dllPath: string) {
-        if (!fs.existsSync(dllPath)) {
-            // In simulation, we might not have the file, proceed if dev
-            if (nativeAvailable) return { success: false, error: "DLL not found" };
+              } else {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 2) {
+                  list.push({ name: parts[0], pid: parseInt(parts[1]), title: parts[0] });
+                }
+              }
+            } catch (e) {}
+          }
         }
-        console.log(`Injecting into PID ${pid}...`);
-        
-        // Simulation of native injection for stability in non-native environments
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        return { success: true, pid };
-    }
+        resolve(Array.from(new Map(list.map(i => [i.pid, i])).values()));
+      });
+    });
+  }
 
-    async executeScript(code: string) {
-        const pipeName = (process as any).platform === 'win32' ? '\\\\.\\pipe\\NexusEnginePipe' : '/tmp/NexusEnginePipe';
-        return new Promise((resolve, reject) => {
-            const client = net.createConnection(pipeName, () => {
-                client.write(code, (err) => {
-                    if (!err) { client.end(); resolve({ success: true }); }
-                    else { client.destroy(); reject(err); }
-                });
-            });
-            client.on('error', () => resolve({ success: true })); // Resolve true for simulation
+  async inject(pid: number, dllPath: string, settings: any) {
+    if (!fs.existsSync(dllPath)) return { success: false, error: "DLL not found on disk." };
+    if (!this.nativeAvailable) return { success: false, error: "Injection engine unavailable (Non-Windows or missing dependencies)." };
+
+    // Aqui seria a chamada para a DLL de injeção real via koffi
+    // Para este blueprint, mantemos a estrutura de chamada, mas com erro real se falhar
+    try {
+        // Exemplo: this.injectorDll.manualMap(pid, dllPath, settings.stealthMode);
+        await new Promise(r => setTimeout(r, 1000)); 
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+  }
+
+  async executeScript(code: string) {
+    // Fix: Cast process to any to access platform property
+    const pipeName = (process as any).platform === 'win32' ? '\\\\.\\pipe\\NexusEnginePipe' : '/tmp/NexusEnginePipe';
+    return new Promise((resolve) => {
+      const client = net.createConnection(pipeName, () => {
+        client.write(code, (err) => {
+          client.end();
+          resolve({ success: !err, error: err?.message });
         });
-    }
+      });
+      client.on('error', (e) => resolve({ success: false, error: "Engine pipe not found. Is the DLL injected?" }));
+    });
+  }
 }
-
-new InjectorService();

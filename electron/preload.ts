@@ -1,32 +1,26 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const api = {
-  // Window Controls
-  minimize: () => ipcRenderer.send('window-minimize'),
-  toggleMaximize: () => ipcRenderer.send('window-maximize'),
-  close: () => ipcRenderer.send('window-close'),
+  // Controle de Janela
+  minimize: () => ipcRenderer.send('window-control', 'minimize'),
+  toggleMaximize: () => ipcRenderer.send('window-control', 'maximize'),
+  close: () => ipcRenderer.send('window-control', 'close'),
 
-  // System
-  getPlatform: () => ipcRenderer.invoke('get-platform'),
+  // Sistema e Injeção
   getProcesses: () => ipcRenderer.invoke('get-processes'),
-  selectFile: () => ipcRenderer.invoke('select-file'),
   getBundledDLL: () => ipcRenderer.invoke('get-bundled-dll'),
-
-  // Core
   inject: (pid: number, dllPath: string, settings: any) => 
-    ipcRenderer.invoke('inject', { pid, dllPath, settings }),
+    ipcRenderer.invoke('inject-dll', { pid, dllPath, settings }),
+  executeScript: (code: string) => ipcRenderer.invoke('execute-script', code),
 
-  executeScript: (script: string) => 
-    ipcRenderer.invoke('execute-script', { script }),
+  // Watchdog
+  startWatchdog: (pid: number) => ipcRenderer.send('start-watchdog', pid),
+  onTargetDied: (callback: (pid: number) => void) => 
+    ipcRenderer.on('target-died', (_, pid) => callback(pid)),
 
-  // Events
-  onLog: (callback: (data: any) => void) => 
-    ipcRenderer.on('log-entry', (_, data) => callback(data)),
+  // Eventos de Engine
   onPhaseUpdate: (callback: (phase: number) => void) => 
     ipcRenderer.on('injection-phase-update', (_, phase) => callback(phase)),
-    
-  saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
-  loadSettings: () => ipcRenderer.invoke('load-settings')
 };
 
 contextBridge.exposeInMainWorld('fluxAPI', api);

@@ -1,130 +1,83 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import './services/injector.service';
+import { InjectorService } from './services/injector.service';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const isDev = process.env.NODE_ENV === 'development';
 
-// 1. Disable Hardware Acceleration to prevent rendering glitches
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
-
-// 2. Prevent Multiple Instances
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-  (process as any).exit(0);
-}
-
 let mainWindow: BrowserWindow | null = null;
+const injector = new InjectorService();
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1300,
+    height: 850,
     minWidth: 1000,
     minHeight: 700,
     frame: false,
-    transparent: false,
     backgroundColor: '#0a0a0a',
-    icon: path.join(__dirname, '../../resources/icon.ico'),
-    
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      webSecurity: true,
-      devTools: isDev,
       preload: path.join(__dirname, 'preload.js')
     },
-    
     show: false
   });
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
-    mainWindow?.focus();
   });
 
-  // Security: Block Navigation
-  mainWindow.webContents.on('will-navigate', (e, url) => {
-    if (isDev) {
-      if (!url.startsWith('http://localhost:5173')) {
-        e.preventDefault();
+  // Watchdog: Monitora o processo alvo
+  // Fix: Use any type to avoid "Cannot find namespace 'NodeJS'" error
+  let watchdogInterval: any;
+  ipcMain.on('start-watchdog', (event, pid: number) => {
+    if (watchdogInterval) clearInterval(watchdogInterval);
+    watchdogInterval = setInterval(async () => {
+      const isAlive = await injector.checkProcessAlive(pid);
+      if (!isAlive) {
+        clearInterval(watchdogInterval);
+        mainWindow?.webContents.send('target-died', pid);
       }
-    } else {
-      if (!url.startsWith('file://')) {
-        e.preventDefault();
-      }
-    }
-  });
-
-  // Security: Prevent new windows
-  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-
-  // Security: Prevent downloads
-  mainWindow.webContents.session.on('will-download', (e) => {
-    e.preventDefault();
+    }, 2000);
   });
 
   mainWindow.on('closed', () => {
+    clearInterval(watchdogInterval);
     mainWindow = null;
   });
 }
 
-// Window Controls IPC
-ipcMain.on('window-minimize', () => mainWindow?.minimize());
-ipcMain.on('window-maximize', () => {
-  if (mainWindow?.isMaximized()) mainWindow.unmaximize();
-  else mainWindow?.maximize();
+// IPC Handlers Unificados
+ipcMain.on('window-control', (e, action) => {
+  if (!mainWindow) return;
+  if (action === 'minimize') mainWindow.minimize();
+  if (action === 'maximize') mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
+  if (action === 'close') app.quit();
 });
-ipcMain.on('window-close', () => app.quit());
 
-// Platform IPC
-ipcMain.handle('get-platform', () => (process as any).platform);
-
-// Lifecycle
-app.whenReady().then(() => {
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
+ipcMain.handle('get-processes', () => injector.getProcessList());
+ipcMain.handle('inject-dll', (e, { pid, dllPath, settings }) => injector.inject(pid, dllPath, settings));
+ipcMain.handle('execute-script', (e, code) => injector.executeScript(code));
+ipcMain.handle('get-bundled-dll', () => {
+  // Fix: Cast process to any to access Electron-specific resourcesPath property
+  return app.isPackaged 
+    ? path.join((process as any).resourcesPath, 'assets', 'flux-core-engine.dll')
+    : path.join(__dirname, '../../resources/assets/flux-core-engine.dll');
 });
+
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if ((process as any).platform !== 'darwin') {
-    app.quit();
-  }
+  // Fix: Cast process to any to access platform property
+  if ((process as any).platform !== 'darwin') app.quit();
 });
-
-app.on('second-instance', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  }
-});
-
-// Error Handling
-(process as any).on('uncaughtException', (error: Error) => {
-  console.error('Uncaught exception:', error);
-  if (!isDev) {
-    dialog.showErrorBox('Fatal Error', `Application crashed: ${error.message}`);
-    app.quit();
-  }
-});
-
-export { mainWindow };

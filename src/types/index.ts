@@ -163,6 +163,10 @@ export interface FluxAPI {
   close: () => void;
   saveSettings: (settings: AppSettings) => Promise<boolean>;
   loadSettings: () => Promise<AppSettings | null>;
+
+  // Fix: Add missing methods for watchdog and target monitoring
+  startWatchdog: (pid: number) => void;
+  onTargetDied: (callback: (pid: number) => void) => void;
 }
 
 declare global {
