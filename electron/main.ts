@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { InjectorService } from './services/injector.service';
@@ -37,24 +37,22 @@ function createWindow(): void {
     mainWindow?.show();
   });
 
-  // Watchdog: Monitoramento Real de Processo
+  // Watchdog: Monitora o processo alvo
+  // Fix: Use any type to avoid "Cannot find namespace 'NodeJS'" error
   let watchdogInterval: any;
   ipcMain.on('start-watchdog', (event, pid: number) => {
     if (watchdogInterval) clearInterval(watchdogInterval);
-    
     watchdogInterval = setInterval(async () => {
       const isAlive = await injector.checkProcessAlive(pid);
       if (!isAlive) {
         clearInterval(watchdogInterval);
-        if(mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('target-died', pid);
-        }
+        mainWindow?.webContents.send('target-died', pid);
       }
-    }, 2000); // Checagem a cada 2s para economizar CPU
+    }, 2000);
   });
 
   mainWindow.on('closed', () => {
-    if(watchdogInterval) clearInterval(watchdogInterval);
+    clearInterval(watchdogInterval);
     mainWindow = null;
   });
 }
@@ -68,14 +66,10 @@ ipcMain.on('window-control', (e, action) => {
 });
 
 ipcMain.handle('get-processes', () => injector.getProcessList());
-
-ipcMain.handle('inject-dll', async (e, { pid, dllPath, settings }) => {
-    return await injector.inject(pid, dllPath, settings);
-});
-
+ipcMain.handle('inject-dll', (e, { pid, dllPath, settings }) => injector.inject(pid, dllPath, settings));
 ipcMain.handle('execute-script', (e, code) => injector.executeScript(code));
-
 ipcMain.handle('get-bundled-dll', () => {
+  // Fix: Cast process to any to access Electron-specific resourcesPath property
   return app.isPackaged 
     ? path.join((process as any).resourcesPath, 'assets', 'flux-core-engine.dll')
     : path.join(__dirname, '../../resources/assets/flux-core-engine.dll');
@@ -84,5 +78,6 @@ ipcMain.handle('get-bundled-dll', () => {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // Fix: Cast process to any to access platform property
+  if ((process as any).platform !== 'darwin') app.quit();
 });
