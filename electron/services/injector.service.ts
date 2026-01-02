@@ -29,7 +29,7 @@ export class InjectorService {
     try {
       // @ts-ignore
       this.koffi = require('koffi');
-      if ((process as any).platform === 'win32') {
+      if (process.platform === 'win32') {
         this.nativeAvailable = true;
         this.loadNativeFunctions();
       }
@@ -69,7 +69,7 @@ export class InjectorService {
 
   async checkProcessAlive(pid: number): Promise<boolean> {
     try {
-      (process as any).kill(pid, 0);
+      process.kill(pid, 0);
       return true;
     } catch (e) {
       return false;
@@ -78,7 +78,10 @@ export class InjectorService {
 
   async getProcessList(): Promise<any[]> {
     return new Promise((resolve) => {
-      const cmd = (process as any).platform === 'win32' 
+      // Note: A full native snapshot implementation via Koffi would be ideal here 
+      // but requires complex struct definitions. Keeping exec for stability but
+      // ensure it's not called on every render cycle (fixed in frontend).
+      const cmd = process.platform === 'win32' 
         ? 'tasklist /v /fo csv /NH' 
         : 'ps -A -o comm,pid';
       
@@ -88,7 +91,7 @@ export class InjectorService {
           const lines = stdout.toString().split(/\r?\n/);
           for (const line of lines) {
             try {
-              if ((process as any).platform === 'win32') {
+              if (process.platform === 'win32') {
                 const parts = line.split('","').map(p => p.replace(/^"|"$/g, '').trim());
                 if (parts.length >= 2) {
                   list.push({ name: parts[0], pid: parseInt(parts[1]), title: parts[8] || 'N/A' });
@@ -175,23 +178,4 @@ export class InjectorService {
             // Converter código NTSTATUS para hex para facilitar debug
             const hexStatus = (status >>> 0).toString(16).toUpperCase();
             return { success: false, error: `NtCreateThreadEx failed. NTSTATUS: 0x${hexStatus}` };
-        }
-
-    } catch (e: any) {
-        return { success: false, error: `Exception: ${e.message}` };
-    }
-  }
-
-  async executeScript(code: string) {
-    const pipeName = (process as any).platform === 'win32' ? '\\\\.\\pipe\\NexusEnginePipe' : '/tmp/NexusEnginePipe';
-    return new Promise((resolve) => {
-      const client = net.createConnection(pipeName, () => {
-        client.write(code, (err) => {
-          client.end();
-          resolve({ success: !err, error: err?.message });
-        });
-      });
-      client.on('error', (e) => resolve({ success: false, error: "Pipe error. DLL likely not injected or rejected." }));
-    });
-  }
-}
+    d wa  

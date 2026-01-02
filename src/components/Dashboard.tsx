@@ -21,13 +21,29 @@ const VERIFIED_TARGETS = [
   'overwatch', 'apex', 'cod', 'warzone', 'rust', 'tarkov'
 ];
 
+const isGame = (name: string) => VERIFIED_TARGETS.some(t => name.toLowerCase().includes(t));
+
+const sortProcesses = (list: ProcessInfo[]) => {
+    return [...list].sort((a, b) => {
+        const aIsGame = isGame(a.name);
+        const bIsGame = isGame(b.name);
+        if (aIsGame && !bIsGame) return -1;
+        if (!aIsGame && bIsGame) return 1;
+
+        const aHasTitle = a.title && a.title !== 'Background Process' && a.title !== 'N/A';
+        const bHasTitle = b.title && b.title !== 'Background Process' && b.title !== 'N/A';
+        if (aHasTitle && !bHasTitle) return -1;
+        if (!aHasTitle && bHasTitle) return 1;
+
+        return a.name.localeCompare(b.name);
+    });
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHub, settings }) => {
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [processSearch, setProcessSearch] = useState('');
   const [showProcessSelector, setShowProcessSelector] = useState(false);
-  
-  const isGame = (name: string) => VERIFIED_TARGETS.some(t => name.toLowerCase().includes(t));
 
   const fetchProcesses = async () => {
     setIsScanning(true);
@@ -35,19 +51,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
       try {
         const list = await window.fluxAPI.getProcesses();
         if (Array.isArray(list)) {
-            const sorted = [...list].sort((a, b) => {
-                const aIsGame = isGame(a.name);
-                const bIsGame = isGame(b.name);
-                if (aIsGame && !bIsGame) return -1;
-                if (!aIsGame && bIsGame) return 1;
-
-                const aHasTitle = a.title && a.title !== 'Background Process' && a.title !== 'N/A';
-                const bHasTitle = b.title && b.title !== 'Background Process' && b.title !== 'N/A';
-                if (aHasTitle && !bHasTitle) return -1;
-                if (!aHasTitle && bHasTitle) return 1;
-
-                return a.name.localeCompare(b.name);
-            });
+            const sorted = sortProcesses(list);
             setProcesses(sorted);
             
             if (sorted.length === 0) {

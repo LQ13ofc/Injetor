@@ -40,16 +40,12 @@ const ScriptHub: React.FC<ScriptHubProps> = ({ game, currentPlatform, onClose, o
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
       const hubWidth = 450;
-      const hubHeight = 50; // Approximate header height for clamping top
+      const hubHeight = 50; 
 
-      // Strict bounds checking
       let newX = dragRef.current.initialX + dx;
       let newY = dragRef.current.initialY + dy;
 
-      // Clamp X (prevent going fully offscreen)
       newX = Math.max(0, Math.min(newX, windowWidth - hubWidth));
-      
-      // Clamp Y
       newY = Math.max(0, Math.min(newY, windowHeight - hubHeight));
 
       setPosition({ x: newX, y: newY });
@@ -74,8 +70,8 @@ const ScriptHub: React.FC<ScriptHubProps> = ({ game, currentPlatform, onClose, o
 
   return (
     <div 
-      style={{ left: position.x, top: position.y }}
-      className={`fixed ${isPinned || isDragging ? 'z-[9999]' : 'z-[500]'} w-[450px] bg-[#0d0d11]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_40px_100px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 select-none ring-1 ring-white/5`}
+      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+      className={`fixed top-0 left-0 ${isPinned || isDragging ? 'z-[9999]' : 'z-[500]'} w-[450px] bg-[#0d0d11]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_40px_100px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-300 select-none ring-1 ring-white/5`}
     >
       <div 
         onMouseDown={handleMouseDown}

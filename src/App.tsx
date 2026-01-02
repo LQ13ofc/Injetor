@@ -10,30 +10,13 @@ import SettingsPanel from './components/SettingsPanel';
 import WindowControls from './components/WindowControls';
 import { AppView, GamePack, PluginModule } from './types';
 import { useApp } from './context/AppContext';
-
-const INITIAL_GAME_LIBRARY: GamePack[] = [
-  { 
-      id: 'roblox_god', 
-      name: 'Roblox God Mode', 
-      processName: 'RobloxPlayerBeta.exe', 
-      installed: true,
-      engine: 'Luau',
-      bypassMethod: 'Hyperion Thread Hijack',
-      scripts: [
-          { id: 'god_main', name: 'Enable God Suite (Fly/ESP)', enabled: false, code: '-- Lua God Mode code' },
-          { id: 'inf_jump', name: 'Infinite Jump', enabled: false, code: 'game:GetService("UserInputService").JumpRequest:Connect(function() game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(3) end)' }
-      ]
-  }
-];
+import { INITIAL_GAME_LIBRARY, INITIAL_RUNTIMES } from './data/constants';
 
 const App: React.FC = () => {
   const { view, setView, stats, addLog, logs, clearLogs, settings, setSettings, setStats } = useApp();
   const [showScriptHub, setShowScriptHub] = useState(false);
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
-  const [plugins, setPlugins] = useState<PluginModule[]>([
-    { id: 'lua', name: 'Luau (Flux)', description: 'Roblox Optimized Engine.', enabled: true, version: '5.1.4', type: 'Scripting' },
-    { id: 'asm', name: 'x64 Assembly', description: 'Direct shellcode execution.', enabled: true, version: 'NASM', type: 'Machine Code' },
-  ]);
+  const [plugins, setPlugins] = useState<PluginModule[]>(INITIAL_RUNTIMES);
   const [gameLibrary, setGameLibrary] = useState<GamePack[]>(INITIAL_GAME_LIBRARY);
 
   const handleToggleScript = async (gameId: string, scriptId: string) => {
@@ -41,7 +24,7 @@ const App: React.FC = () => {
       addLog("Injection Required to execute scripts.", 'ERROR', 'EXEC');
       return;
     }
-    // Lógica simplificada de toggle
+    
     setGameLibrary(prev => prev.map(g => {
         if (g.id === gameId) {
             return {
@@ -71,6 +54,26 @@ const App: React.FC = () => {
       setGameLibrary(prev => prev.map(g => g.id === id ? { ...g, installed: !g.installed } : g));
   };
 
+  const handleUpdateParam = (gameId: string, scriptId: string, paramId: string, val: any) => {
+    setGameLibrary(prev => prev.map(g => {
+        if (g.id === gameId) {
+            return {
+                ...g,
+                scripts: g.scripts.map(s => {
+                    if (s.id === scriptId && s.params) {
+                        return {
+                            ...s,
+                            params: s.params.map(p => p.id === paramId ? { ...p, value: val } : p)
+                        };
+                    }
+                    return s;
+                })
+            };
+        }
+        return g;
+    }));
+  };
+
   return (
     <div className="flex h-screen bg-[#0d0d0f] text-zinc-100 font-sans overflow-hidden select-none border border-white/5 rounded-xl shadow-2xl">
       <div className="absolute top-0 left-0 w-full h-8 titlebar-drag z-50 flex justify-end pr-4 pt-2">
@@ -87,7 +90,13 @@ const App: React.FC = () => {
              addLog={addLog}
              settings={settings}
              setSettings={setSettings}
-             onOpenHub={() => { setActiveGameId('roblox_god'); setShowScriptHub(true); }} 
+             onOpenHub={() => { 
+                const roblox = gameLibrary.find(g => g.id === 'roblox');
+                if (roblox) {
+                    setActiveGameId('roblox');
+                    setShowScriptHub(true); 
+                }
+             }} 
           />
         )}
         {view === AppView.EDITOR && <ScriptEditor addLog={addLog} enabledPlugins={plugins} />}
@@ -111,7 +120,7 @@ const App: React.FC = () => {
             currentPlatform="win32"
             onClose={() => setShowScriptHub(false)}
             onToggleScript={handleToggleScript}
-            onUpdateParam={() => {}}
+            onUpdateParam={handleUpdateParam}
         />
       )}
     </div>

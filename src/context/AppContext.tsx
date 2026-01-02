@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { AppSettings, SystemStats, LogEntry, AppView, GamePack, PluginModule } from '../types';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { AppSettings, SystemStats, LogEntry, AppView } from '../types';
 
 interface AppContextType {
   view: AppView;
@@ -58,7 +58,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, ...prev].slice(0, 100));
   }, []);
 
-  const clearLogs = () => setLogs([]);
+  const clearLogs = useCallback(() => setLogs([]), []);
 
   // Escuta eventos do Main Process
   useEffect(() => {
@@ -70,8 +70,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [addLog]);
 
+  const contextValue = useMemo(() => ({
+    view,
+    setView,
+    logs,
+    addLog,
+    settings,
+    setSettings,
+    stats,
+    setStats,
+    clearLogs
+  }), [view, logs, settings, stats, addLog, clearLogs]);
+
   return (
-    <AppContext.Provider value={{ view, setView, logs, addLog, settings, setSettings, stats, setStats, clearLogs }}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );
