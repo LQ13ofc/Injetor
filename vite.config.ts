@@ -8,13 +8,13 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
-  root: path.resolve(__dirname, 'src/renderer'),
+  root: path.join(__dirname, 'src/renderer'),
   base: './',
   esbuild: {
     drop: ['console', 'debugger']
   },
   build: {
-    outDir: path.resolve(__dirname, 'dist/renderer'),
+    outDir: path.join(__dirname, 'dist/renderer'),
     emptyOutDir: true,
     minify: 'esbuild',
     sourcemap: false,
@@ -30,7 +30,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src/renderer')
+      '@': path.join(__dirname, 'src/renderer')
     }
   },
   server: {
