@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Shield, Monitor, Network, HardDrive, Cpu as Chip, Ghost, Eraser, Save, Upload, Sun, Moon } from 'lucide-react';
-import { AppSettings, SystemStats } from '../types';
+import { Settings as SettingsIcon, Monitor, Network, HardDrive, Cpu as Chip, Ghost, Eraser, Save, Upload, Sun, Moon, Shield } from 'lucide-react';
+import { AppSettings, SystemStats } from '../../types';
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -16,11 +15,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
   const [activeTab, setActiveTab] = useState<SettingsTab>('GENERAL');
 
   const toggleSetting = (key: keyof AppSettings) => {
-    setSettings(prev => ({ ...prev, [key]: typeof prev[key] === 'boolean' ? !prev[key] : prev[key] }));
+    setSettings((prev: AppSettings) => ({ ...prev, [key]: typeof prev[key] === 'boolean' ? !prev[key] : prev[key] }));
   };
 
   const updateNested = (section: keyof AppSettings, key: string, value: any) => {
-    setSettings(prev => ({
+    setSettings((prev: AppSettings) => ({
         ...prev,
         [section]: {
             ...(prev[section] as any),
@@ -82,7 +81,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
                             </div>
                         </div>
                         <button 
-                            onClick={() => setSettings(p => ({...p, theme: p.theme === 'dark' ? 'light' : 'dark'}))}
+                            onClick={() => setSettings((p: AppSettings) => ({...p, theme: p.theme === 'dark' ? 'light' : 'dark'}))}
                             className="px-4 py-2 bg-sidebar border border-border-dim rounded-lg text-[10px] font-bold uppercase text-content hover:bg-main transition-colors"
                         >
                             {settings.theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
@@ -134,7 +133,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
                             {['INTERNAL', 'EXTERNAL'].map((strat) => (
                                 <button 
                                     key={strat}
-                                    onClick={() => setSettings(p => ({...p, executionStrategy: strat as any}))}
+                                    onClick={() => setSettings((p: AppSettings) => ({...p, executionStrategy: strat as any}))}
                                     className={`py-3 rounded-xl text-[10px] font-black uppercase transition-all ${settings.executionStrategy === strat ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'bg-main text-muted border border-border-dim hover:bg-border-dim'}`}
                                 >
                                     {strat}
@@ -155,7 +154,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, setSettings, st
                         max="4096" 
                         step="128"
                         value={settings.memoryBuffer}
-                        onChange={(e) => setSettings(prev => ({...prev, memoryBuffer: parseInt(e.target.value)}))}
+                        onChange={(e) => setSettings((prev: AppSettings) => ({...prev, memoryBuffer: parseInt(e.target.value)}))}
                         className="w-full h-1.5 bg-sidebar rounded-lg appearance-none cursor-pointer accent-blue-600"
                         />
                     </div>

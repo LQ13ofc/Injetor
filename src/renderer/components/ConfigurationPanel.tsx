@@ -1,10 +1,10 @@
 import React from 'react';
-import { Settings, Zap, FolderOpen, Target, Cpu } from 'lucide-react';
+import { Settings, Zap, FolderOpen, Target } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { InjectionMethod, InjectionErrorCode } from '../../types';
+import { InjectionErrorCode } from '../../types';
 
 const ConfigurationPanel: React.FC = () => {
-  const { stats, setStats, settings, setSettings, addLog } = useApp();
+  const { stats, setStats, settings, addLog } = useApp();
   const [isInjecting, setIsInjecting] = React.useState(false);
 
   const processName = stats.target.process?.name || "";

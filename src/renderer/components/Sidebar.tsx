@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   LayoutDashboard, 
   Code2, 
@@ -9,7 +8,7 @@ import {
   Package,
   Settings
 } from 'lucide-react';
-import { AppView } from '../types';
+import { AppView } from '../../types';
 
 interface SidebarProps {
   currentView: AppView;
