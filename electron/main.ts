@@ -1,11 +1,16 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import crypto from 'crypto';
 import { InjectorService } from './services/injector.service';
 
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow: BrowserWindow | null = null;
-const injector = new InjectorService();
+
+// Security: Generate a random session token for this execution instance
+// This prevents hardcoded secrets and makes external hijacking significantly harder
+const sessionToken = crypto.randomBytes(32).toString('hex');
+const injector = new InjectorService(sessionToken);
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({

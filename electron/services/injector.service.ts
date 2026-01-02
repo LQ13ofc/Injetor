@@ -18,44 +18,63 @@ const TOKEN_QUERY = 0x0008;
 
 // Config Constants
 const PIPE_NAME = '\\\\.\\pipe\\NexusEnginePipe';
-const IPC_TOKEN = "FLUX_SEC_TOKEN_V1";
 const IGNORED_PROCESSES = new Set(['svchost.exe', 'conhost.exe', 'System', 'Idle', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe', 'lsass.exe', 'fontdrvhost.exe', 'Memory Compression']);
+
+// Strict FFI Interfaces
+interface Kernel32 {
+  OpenProcess: (dwDesiredAccess: number, bInheritHandle: number, dwProcessId: number) => number;
+  VirtualAllocEx: (hProcess: number, lpAddress: number, dwSize: number, flAllocationType: number, flProtect: number) => number;
+  WriteProcessMemory: (hProcess: number, lpBaseAddress: number, lpBuffer: string, nSize: number, lpNumberOfBytesWritten: number[]) => number;
+  GetModuleHandleA: (lpModuleName: string) => number;
+  GetProcAddress: (hModule: number, lpProcName: string) => number;
+  CloseHandle: (hObject: number) => number;
+  GetCurrentProcess: () => number;
+  CreateRemoteThread: (hProcess: number, lpThreadAttributes: any, dwStackSize: number, lpStartAddress: number, lpParameter: number, dwCreationFlags: number, lpThreadId: any) => number;
+  CreateToolhelp32Snapshot: (dwFlags: number, th32ProcessID: number) => number;
+  Process32First: (hSnapshot: number, lppe: any) => number;
+  Process32Next: (hSnapshot: number, lppe: any) => number;
+}
+
+interface Ntdll {
+  NtCreateThreadEx: (
+    ThreadHandle: number[], 
+    DesiredAccess: number, 
+    ObjectAttributes: any, 
+    ProcessHandle: number, 
+    StartRoutine: number, 
+    Argument: number, 
+    CreateFlags: number, 
+    ZeroBits: number, 
+    StackSize: number, 
+    MaximumStackSize: number, 
+    AttributeList: any
+  ) => number;
+}
+
+interface Advapi32 {
+  OpenProcessToken: (ProcessHandle: number, DesiredAccess: number, TokenHandle: number[]) => number;
+  LookupPrivilegeValueA: (lpSystemName: string | null, lpName: string, lpLuid: any) => number;
+  AdjustTokenPrivileges: (TokenHandle: number, DisableAllPrivileges: number, NewState: any, BufferLength: number, PreviousState: any, ReturnLength: any) => number;
+}
 
 export class InjectorService {
   private nativeAvailable = false;
   private koffi: any;
+  private sessionToken: string;
   
-  // Libraries
-  private user32: any;
-  private kernel32: any;
-  private ntdll: any;
-  private advapi32: any;
-
-  // Native Functions
-  private OpenProcess: any;
-  private VirtualAllocEx: any;
-  private WriteProcessMemory: any;
-  private GetModuleHandleA: any;
-  private GetProcAddress: any;
-  private CloseHandle: any;
-  private CreateRemoteThread: any; // Fallback
-  private NtCreateThreadEx: any;
-  private CreateToolhelp32Snapshot: any;
-  private Process32First: any;
-  private Process32Next: any;
-  
-  // Privilege Functions
-  private OpenProcessToken: any;
-  private LookupPrivilegeValueA: any;
-  private AdjustTokenPrivileges: any;
-  private GetCurrentProcess: any;
+  // Native Function Wrappers
+  private kernel32Funcs: Partial<Kernel32> = {};
+  private ntdllFuncs: Partial<Ntdll> = {};
+  private advapi32Funcs: Partial<Advapi32> = {};
   
   // Types
   private ProcessEntry32Type: any;
   private TokenPrivilegesType: any;
   private LuidType: any;
 
-  constructor() {
+  constructor(sessionToken: string) {
+    this.sessionToken = sessionToken;
+    
     if (process.platform === 'win32') {
       try {
         // @ts-ignore
@@ -72,22 +91,22 @@ export class InjectorService {
   }
 
   private loadNativeFunctions() {
-    this.user32 = this.koffi.load('user32.dll');
-    this.kernel32 = this.koffi.load('kernel32.dll');
-    this.ntdll = this.koffi.load('ntdll.dll');
-    this.advapi32 = this.koffi.load('advapi32.dll');
+    const user32 = this.koffi.load('user32.dll');
+    const kernel32 = this.koffi.load('kernel32.dll');
+    const ntdll = this.koffi.load('ntdll.dll');
+    const advapi32 = this.koffi.load('advapi32.dll');
 
     // Kernel32
-    this.OpenProcess = this.kernel32.func('__stdcall', 'OpenProcess', 'int', ['uint32', 'int', 'uint32']);
-    this.VirtualAllocEx = this.kernel32.func('__stdcall', 'VirtualAllocEx', 'int', ['int', 'int', 'int', 'int', 'int']);
-    this.WriteProcessMemory = this.kernel32.func('__stdcall', 'WriteProcessMemory', 'int', ['int', 'int', 'str', 'int', 'int*']);
-    this.GetModuleHandleA = this.kernel32.func('__stdcall', 'GetModuleHandleA', 'int', ['str']);
-    this.GetProcAddress = this.kernel32.func('__stdcall', 'GetProcAddress', 'int', ['int', 'str']);
-    this.CloseHandle = this.kernel32.func('__stdcall', 'CloseHandle', 'int', ['int']);
-    this.GetCurrentProcess = this.kernel32.func('__stdcall', 'GetCurrentProcess', 'int', []);
+    this.kernel32Funcs.OpenProcess = kernel32.func('__stdcall', 'OpenProcess', 'int', ['uint32', 'int', 'uint32']);
+    this.kernel32Funcs.VirtualAllocEx = kernel32.func('__stdcall', 'VirtualAllocEx', 'int', ['int', 'int', 'int', 'int', 'int']);
+    this.kernel32Funcs.WriteProcessMemory = kernel32.func('__stdcall', 'WriteProcessMemory', 'int', ['int', 'int', 'str', 'int', 'int*']);
+    this.kernel32Funcs.GetModuleHandleA = kernel32.func('__stdcall', 'GetModuleHandleA', 'int', ['str']);
+    this.kernel32Funcs.GetProcAddress = kernel32.func('__stdcall', 'GetProcAddress', 'int', ['int', 'str']);
+    this.kernel32Funcs.CloseHandle = kernel32.func('__stdcall', 'CloseHandle', 'int', ['int']);
+    this.kernel32Funcs.GetCurrentProcess = kernel32.func('__stdcall', 'GetCurrentProcess', 'int', []);
     
     // Fallback Method
-    this.CreateRemoteThread = this.kernel32.func('__stdcall', 'CreateRemoteThread', 'int', ['int', 'ptr', 'int', 'ptr', 'ptr', 'uint32', 'out uint32']);
+    this.kernel32Funcs.CreateRemoteThread = kernel32.func('__stdcall', 'CreateRemoteThread', 'int', ['int', 'ptr', 'int', 'ptr', 'ptr', 'uint32', 'out uint32']);
 
     // Snapshot
     this.ProcessEntry32Type = this.koffi.struct('PROCESSENTRY32', {
@@ -102,12 +121,12 @@ export class InjectorService {
         dwFlags: 'uint32',
         szExeFile: this.koffi.array('char', 260)
     });
-    this.CreateToolhelp32Snapshot = this.kernel32.func('__stdcall', 'CreateToolhelp32Snapshot', 'int', ['uint32', 'uint32']);
-    this.Process32First = this.kernel32.func('__stdcall', 'Process32First', 'int', ['int', 'PROCESSENTRY32 *']);
-    this.Process32Next = this.kernel32.func('__stdcall', 'Process32Next', 'int', ['int', 'PROCESSENTRY32 *']);
+    this.kernel32Funcs.CreateToolhelp32Snapshot = kernel32.func('__stdcall', 'CreateToolhelp32Snapshot', 'int', ['uint32', 'uint32']);
+    this.kernel32Funcs.Process32First = kernel32.func('__stdcall', 'Process32First', 'int', ['int', 'PROCESSENTRY32 *']);
+    this.kernel32Funcs.Process32Next = kernel32.func('__stdcall', 'Process32Next', 'int', ['int', 'PROCESSENTRY32 *']);
 
     // Ntdll
-    this.NtCreateThreadEx = this.ntdll.func('__stdcall', 'NtCreateThreadEx', 'int', [
+    this.ntdllFuncs.NtCreateThreadEx = ntdll.func('__stdcall', 'NtCreateThreadEx', 'int', [
         'out ptr', 'int', 'ptr', 'int', 'ptr', 'ptr', 'int', 'int', 'int', 'int', 'ptr'
     ]);
 
@@ -116,27 +135,27 @@ export class InjectorService {
     const LuidAndAttributes = this.koffi.struct('LUID_AND_ATTRIBUTES', { Luid: this.LuidType, Attributes: 'uint32' });
     this.TokenPrivilegesType = this.koffi.struct('TOKEN_PRIVILEGES', { PrivilegeCount: 'uint32', Privileges: this.koffi.array(LuidAndAttributes, 1) });
 
-    this.OpenProcessToken = this.advapi32.func('__stdcall', 'OpenProcessToken', 'int', ['int', 'uint32', 'out int']);
-    this.LookupPrivilegeValueA = this.advapi32.func('__stdcall', 'LookupPrivilegeValueA', 'int', ['str', 'str', 'ptr']);
-    this.AdjustTokenPrivileges = this.advapi32.func('__stdcall', 'AdjustTokenPrivileges', 'int', ['int', 'int', 'TOKEN_PRIVILEGES *', 'int', 'ptr', 'ptr']);
+    this.advapi32Funcs.OpenProcessToken = advapi32.func('__stdcall', 'OpenProcessToken', 'int', ['int', 'uint32', 'out int']);
+    this.advapi32Funcs.LookupPrivilegeValueA = advapi32.func('__stdcall', 'LookupPrivilegeValueA', 'int', ['str', 'str', 'ptr']);
+    this.advapi32Funcs.AdjustTokenPrivileges = advapi32.func('__stdcall', 'AdjustTokenPrivileges', 'int', ['int', 'int', 'TOKEN_PRIVILEGES *', 'int', 'ptr', 'ptr']);
   }
 
   private setDebugPrivilege() {
       try {
-          const hProcess = this.GetCurrentProcess();
+          const hProcess = this.kernel32Funcs.GetCurrentProcess!();
           let hToken = [0];
-          if (!this.OpenProcessToken(hProcess, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, hToken)) return;
+          if (!this.advapi32Funcs.OpenProcessToken!(hProcess, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, hToken)) return;
 
           const luid = {};
-          if (!this.LookupPrivilegeValueA(null, "SeDebugPrivilege", luid)) return;
+          if (!this.advapi32Funcs.LookupPrivilegeValueA!(null, "SeDebugPrivilege", luid)) return;
 
           const tp = {
               PrivilegeCount: 1,
               Privileges: [{ Luid: luid, Attributes: SE_PRIVILEGE_ENABLED }]
           };
 
-          this.AdjustTokenPrivileges(hToken[0], 0, tp, 0, null, null);
-          this.CloseHandle(hToken[0]);
+          this.advapi32Funcs.AdjustTokenPrivileges!(hToken[0], 0, tp, 0, null, null);
+          this.kernel32Funcs.CloseHandle!(hToken[0]);
       } catch (e) {
           console.error("Failed to set SeDebugPrivilege:", e);
       }
@@ -157,12 +176,12 @@ export class InjectorService {
 
     return new Promise((resolve) => {
         const list: any[] = [];
-        const hSnapshot = this.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        const hSnapshot = this.kernel32Funcs.CreateToolhelp32Snapshot!(TH32CS_SNAPPROCESS, 0);
         if (hSnapshot === -1) { resolve([]); return; }
 
         try {
             const entry = { dwSize: this.koffi.sizeof(this.ProcessEntry32Type) };
-            let success = this.Process32First(hSnapshot, entry);
+            let success = this.kernel32Funcs.Process32First!(hSnapshot, entry);
             
             while (success) {
                 const name = (entry as any).szExeFile; 
@@ -172,10 +191,10 @@ export class InjectorService {
                 if (pid > 4 && !IGNORED_PROCESSES.has(name)) {
                      list.push({ name: name, pid: pid, title: name });
                 }
-                success = this.Process32Next(hSnapshot, entry);
+                success = this.kernel32Funcs.Process32Next!(hSnapshot, entry);
             }
         } finally {
-            this.CloseHandle(hSnapshot);
+            this.kernel32Funcs.CloseHandle!(hSnapshot);
         }
         resolve(list);
     });
@@ -191,20 +210,20 @@ export class InjectorService {
     let hThreadHandle = 0;
 
     try {
-        hProcess = this.OpenProcess(INJECTION_ACCESS_MASK, 0, pid);
+        hProcess = this.kernel32Funcs.OpenProcess!(INJECTION_ACCESS_MASK, 0, pid);
         if (!hProcess) return { success: false, code: InjectionErrorCode.ACCESS_DENIED, error: "Access Denied. Check Anti-Virus." };
 
         const pathLen = dllPath.length + 1;
-        pRemoteMem = this.VirtualAllocEx(hProcess, 0, pathLen, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        pRemoteMem = this.kernel32Funcs.VirtualAllocEx!(hProcess, 0, pathLen, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         if (!pRemoteMem) return { success: false, code: InjectionErrorCode.MEMORY_ALLOCATION_FAILED, error: "VirtualAllocEx failed" };
 
         const written = [0];
-        if (!this.WriteProcessMemory(hProcess, pRemoteMem, dllPath, pathLen, written)) {
+        if (!this.kernel32Funcs.WriteProcessMemory!(hProcess, pRemoteMem, dllPath, pathLen, written)) {
             return { success: false, code: InjectionErrorCode.WRITE_MEMORY_FAILED, error: "WriteProcessMemory failed" };
         }
 
-        const hKernel32 = this.GetModuleHandleA("kernel32.dll");
-        const pLoadLibrary = this.GetProcAddress(hKernel32, "LoadLibraryA");
+        const hKernel32 = this.kernel32Funcs.GetModuleHandleA!("kernel32.dll");
+        const pLoadLibrary = this.kernel32Funcs.GetProcAddress!(hKernel32, "LoadLibraryA");
         if (!pLoadLibrary) return { success: false, code: InjectionErrorCode.MODULE_HANDLE_FAILED, error: "GetProcAddress failed" };
 
         // Strategy: Try NtCreateThreadEx (Stealth), Fallback to CreateRemoteThread
@@ -212,13 +231,13 @@ export class InjectorService {
         let status = -1;
 
         if (settings.stealthMode) {
-             status = this.NtCreateThreadEx(hThreadBuffer, THREAD_ALL_ACCESS, null, hProcess, pLoadLibrary, pRemoteMem, 0, 0, 0, 0, null);
+             status = this.ntdllFuncs.NtCreateThreadEx!(hThreadBuffer, THREAD_ALL_ACCESS, null, hProcess, pLoadLibrary, pRemoteMem, 0, 0, 0, 0, null);
              if (status >= 0) hThreadHandle = hThreadBuffer[0];
         }
 
         // Fallback or explicit standard injection
         if (status < 0 || !settings.stealthMode) {
-            hThreadHandle = this.CreateRemoteThread(hProcess, null, 0, pLoadLibrary, pRemoteMem, 0, null);
+            hThreadHandle = this.kernel32Funcs.CreateRemoteThread!(hProcess, null, 0, pLoadLibrary, pRemoteMem, 0, null);
         }
 
         if (hThreadHandle) {
@@ -230,8 +249,8 @@ export class InjectorService {
     } catch (e: any) {
         return { success: false, code: InjectionErrorCode.UNKNOWN_ERROR, error: `Exception: ${e.message}` };
     } finally {
-        if (hThreadHandle) this.CloseHandle(hThreadHandle);
-        if (hProcess) this.CloseHandle(hProcess);
+        if (hThreadHandle) this.kernel32Funcs.CloseHandle!(hThreadHandle);
+        if (hProcess) this.kernel32Funcs.CloseHandle!(hProcess);
         // Note: We deliberately do not free pRemoteMem immediately as LoadLibrary needs to read it. 
         // In a production cheat, you would cleanup after a delay or via a shellcode stub.
     }
@@ -242,8 +261,8 @@ export class InjectorService {
     
     return new Promise((resolve) => {
       const client = net.createConnection(PIPE_NAME, () => {
-        // Send token + code
-        const payload = JSON.stringify({ token: IPC_TOKEN, script: code });
+        // Send session token (generated at runtime) + code
+        const payload = JSON.stringify({ token: this.sessionToken, script: code });
         client.write(payload, (err) => {
           client.end();
           if (err) resolve({ success: false, error: err.message });

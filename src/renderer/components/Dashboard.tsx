@@ -4,9 +4,13 @@ import {
   PlayCircle, Ghost, Power, ShieldCheck,
   Gamepad2
 } from 'lucide-react';
-import { FixedSizeList as List } from 'react-window';
+import * as ReactWindow from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { SystemStats, ProcessInfo, AppSettings, InjectionErrorCode } from '../../types';
+
+// Fix for strict type checking on react-window and react-virtualized-auto-sizer
+const List = (ReactWindow as any).FixedSizeList;
+const AutoSizerComp = AutoSizer as any;
 
 interface DashboardProps {
   stats: SystemStats;
@@ -34,7 +38,9 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
   const isGame = (name: string) => VERIFIED_TARGETS.some(t => name.toLowerCase().includes(t));
 
   const fetchProcesses = async () => {
+    // Skip fetching if user is interacting with search or selector to avoid jitter
     if (isScanning) return;
+    
     setIsScanning(true);
     if (window.fluxAPI) {
       try {
@@ -53,13 +59,11 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
             if (currentHash !== prevProcessesHash.current) {
                 setProcesses(sorted);
                 prevProcessesHash.current = currentHash;
-                if (sorted.length === 0) {
-                    addLog("Scan complete: No relevant processes found.", "WARN", "SYSTEM");
-                }
             }
         }
       } catch (e) {
-          addLog("Process scanner error.", "ERROR", "SYSTEM");
+          // Silent catch for background polling
+          // addLog("Process scanner error.", "ERROR", "SYSTEM");
       }
     }
     setIsScanning(false);
@@ -75,8 +79,19 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
             setStats(prev => ({ ...prev, injectionPhase: phase }));
         });
     }
+
+    // Initial Fetch
     fetchProcesses();
-  }, []);
+
+    // Smart Polling: Refresh process list every 5 seconds
+    const interval = setInterval(() => {
+        if (!document.hidden && !showProcessSelector) {
+            fetchProcesses();
+        }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []); // Remove dependencies to prevent re-setup loops, handled internally
 
   const handleInject = async () => {
     if (!stats.target.process) {
@@ -216,8 +231,8 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                                     {isScanning ? 'Scanning...' : 'No matching processes found.'}
                                 </div>
                             ) : (
-                                <AutoSizer>
-                                    {({ height, width }) => (
+                                <AutoSizerComp>
+                                    {({ height, width }: { height: number, width: number }) => (
                                         <List
                                             height={height}
                                             itemCount={filteredProcesses.length}
@@ -228,7 +243,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                                             {ProcessRow}
                                         </List>
                                     )}
-                                </AutoSizer>
+                                </AutoSizerComp>
                             )}
                         </div>
                     </div>
