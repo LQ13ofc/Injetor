@@ -24,12 +24,16 @@
     "koffi": "^2.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.460.0"
+    "lucide-react": "^0.460.0",
+    "react-window": "^1.8.10",
+    "react-virtualized-auto-sizer": "^1.0.24"
   },
   "devDependencies": {
     "@types/node": "^20.11.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/react-window": "^1.8.8",
+    "@types/react-virtualized-auto-sizer": "^1.0.4",
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",

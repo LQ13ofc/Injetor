@@ -4,7 +4,9 @@ import {
   PlayCircle, Ghost, Power, ShieldCheck,
   Gamepad2
 } from 'lucide-react';
-import { SystemStats, ProcessInfo, AppSettings } from '../types';
+import { FixedSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+import { SystemStats, ProcessInfo, AppSettings, InjectionErrorCode } from '../../types';
 
 interface DashboardProps {
   stats: SystemStats;
@@ -27,7 +29,6 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
   const [processSearch, setProcessSearch] = useState('');
   const [showProcessSelector, setShowProcessSelector] = useState(false);
   
-  // Ref to track previous process list string for comparison
   const prevProcessesHash = useRef<string>('');
 
   const isGame = (name: string) => VERIFIED_TARGETS.some(t => name.toLowerCase().includes(t));
@@ -48,12 +49,10 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                 return a.name.localeCompare(b.name);
             });
             
-            // Optimization: Only update state if data changed
             const currentHash = JSON.stringify(sorted.map(p => p.pid));
             if (currentHash !== prevProcessesHash.current) {
                 setProcesses(sorted);
                 prevProcessesHash.current = currentHash;
-                
                 if (sorted.length === 0) {
                     addLog("Scan complete: No relevant processes found.", "WARN", "SYSTEM");
                 }
@@ -89,13 +88,17 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
     if (window.fluxAPI) {
         addLog(`Attaching to PID ${stats.target.process.pid} (${stats.target.process.name})...`, 'INFO', 'KERNEL');
         const result = await window.fluxAPI.inject(stats.target.process.pid, stats.target.dllPath!, settings);
+        
         if (result.success) {
             setStats(p => ({ ...p, processStatus: 'INJECTED', pipeConnected: true }));
             addLog('Injection Successful. Kernel Bridge Established.', 'SUCCESS', 'KERNEL');
             setTimeout(onOpenHub, 800);
         } else {
             setStats(p => ({ ...p, processStatus: 'ERROR' }));
-            addLog(`Injection Failed: ${result.error}`, 'ERROR', 'INJECTOR');
+            let errorMsg = result.error;
+            if (result.code === InjectionErrorCode.ACCESS_DENIED) errorMsg = "Access Denied. Run as Admin or check Anti-Virus.";
+            if (result.code === InjectionErrorCode.DLL_NOT_FOUND) errorMsg = "Core DLL missing from filesystem.";
+            addLog(`Injection Failed: ${errorMsg}`, 'ERROR', 'INJECTOR');
         }
     } else {
         setTimeout(() => {
@@ -112,6 +115,32 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
         (p.title && p.title.toLowerCase().includes(processSearch.toLowerCase()))
     );
   }, [processes, processSearch]);
+
+  const ProcessRow = ({ index, style }: { index: number, style: React.CSSProperties }) => {
+    const proc = filteredProcesses[index];
+    const verified = isGame(proc.name);
+    return (
+        <div style={style} className="px-1">
+            <div 
+                onClick={() => { setStats(s => ({...s, target: {...s.target, process: proc}})); setShowProcessSelector(false); }}
+                className={`flex items-center text-xs p-2 rounded-lg cursor-pointer transition-colors group ${stats.target.process?.pid === proc.pid ? 'bg-blue-600/10' : 'hover:bg-main/50'}`}
+            >
+                <div className="w-[45%] flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded flex shrink-0 items-center justify-center text-[10px] font-bold ${verified ? 'bg-green-500/10 text-green-500' : 'bg-sidebar text-muted'}`}>
+                        {verified ? <Gamepad2 size={12} /> : proc.name.charAt(0)}
+                    </div>
+                    <div className="overflow-hidden">
+                        <div className={`font-bold truncate ${verified ? 'text-green-400' : 'text-content'}`}>{proc.name}</div>
+                        <div className="text-[9px] text-muted truncate">{proc.title}</div>
+                    </div>
+                </div>
+                <div className="w-[15%] font-mono text-muted">{proc.pid}</div>
+                <div className="w-[20%] text-muted truncate">{proc.user || '-'}</div>
+                <div className="w-[20%] text-[9px] text-muted truncate text-right" title={proc.path}>{proc.path || '-'}</div>
+            </div>
+        </div>
+    );
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col gap-6">
@@ -135,11 +164,11 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start h-full overflow-hidden">
-        <div className="lg:col-span-8 space-y-6 flex flex-col">
-            <div className={`bg-panel border ${showProcessSelector ? 'border-blue-500/30 ring-1 ring-blue-500/20' : 'border-border-dim'} p-1 rounded-3xl transition-all shadow-lg shrink-0 duration-300`}>
+        <div className="lg:col-span-8 space-y-6 flex flex-col h-full overflow-hidden">
+            <div className={`bg-panel border ${showProcessSelector ? 'border-blue-500/30 ring-1 ring-blue-500/20' : 'border-border-dim'} p-1 rounded-3xl transition-all shadow-lg flex flex-col duration-300 max-h-[600px]`}>
                 <div 
                     onClick={() => setShowProcessSelector(!showProcessSelector)}
-                    className="p-5 flex items-center justify-between cursor-pointer hover:bg-main/50 rounded-2xl transition-colors"
+                    className="p-5 flex items-center justify-between cursor-pointer hover:bg-main/50 rounded-2xl transition-colors shrink-0"
                 >
                     <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${stats.target.process ? 'bg-green-500/10 text-green-500' : 'bg-sidebar text-muted'}`}>
@@ -165,8 +194,8 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                 </div>
 
                 {showProcessSelector && (
-                    <div className="border-t border-border-dim p-4 animate-in slide-in-from-top-2 duration-200">
-                        <div className="relative mb-3">
+                    <div className="border-t border-border-dim p-4 animate-in slide-in-from-top-2 duration-200 flex-1 flex flex-col h-[400px]">
+                        <div className="relative mb-3 shrink-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
                             <input 
                                 type="text" placeholder="Filter processes..." value={processSearch}
@@ -175,49 +204,31 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, setStats, addLog, onOpenHu
                                 autoFocus
                             />
                         </div>
-                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-1">
+                        <div className="flex text-[9px] text-muted font-bold uppercase tracking-wider px-3 pb-2 border-b border-border-dim mb-2 shrink-0">
+                             <div className="w-[45%] pl-1">Name</div>
+                             <div className="w-[15%]">PID</div>
+                             <div className="w-[20%]">User</div>
+                             <div className="w-[20%] text-right">Path</div>
+                        </div>
+                        <div className="flex-1">
                             {filteredProcesses.length === 0 ? (
                                 <div className="text-center py-8 text-muted text-xs italic">
                                     {isScanning ? 'Scanning...' : 'No matching processes found.'}
                                 </div>
                             ) : (
-                                <table className="w-full text-left">
-                                    <thead className="text-[9px] text-muted font-bold uppercase tracking-wider border-b border-border-dim">
-                                        <tr>
-                                            <th className="pb-2 pl-2">Name / Title</th>
-                                            <th className="pb-2">PID</th>
-                                            <th className="pb-2">User</th>
-                                            <th className="pb-2">Path</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-xs">
-                                        {filteredProcesses.map(proc => {
-                                            const verified = isGame(proc.name);
-                                            return (
-                                                <tr 
-                                                    key={proc.pid}
-                                                    onClick={() => { setStats(s => ({...s, target: {...s.target, process: proc}})); setShowProcessSelector(false); }}
-                                                    className={`cursor-pointer transition-colors group ${stats.target.process?.pid === proc.pid ? 'bg-blue-600/10' : 'hover:bg-main/50'}`}
-                                                >
-                                                    <td className="p-2 rounded-l-lg">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${verified ? 'bg-green-500/10 text-green-500' : 'bg-sidebar text-muted'}`}>
-                                                                {verified ? <Gamepad2 size={12} /> : proc.name.charAt(0)}
-                                                            </div>
-                                                            <div>
-                                                                <div className={`font-bold ${verified ? 'text-green-400' : 'text-content'}`}>{proc.name}</div>
-                                                                <div className="text-[10px] text-muted truncate max-w-[120px]">{proc.title}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-2 font-mono text-muted">{proc.pid}</td>
-                                                    <td className="p-2 text-muted truncate max-w-[80px]">{proc.user || '-'}</td>
-                                                    <td className="p-2 text-[10px] text-muted truncate max-w-[100px] rounded-r-lg" title={proc.path}>{proc.path || '-'}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                <AutoSizer>
+                                    {({ height, width }) => (
+                                        <List
+                                            height={height}
+                                            itemCount={filteredProcesses.length}
+                                            itemSize={48}
+                                            width={width}
+                                            className="custom-scrollbar"
+                                        >
+                                            {ProcessRow}
+                                        </List>
+                                    )}
+                                </AutoSizer>
                             )}
                         </div>
                     </div>

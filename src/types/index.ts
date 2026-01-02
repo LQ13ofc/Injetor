@@ -1,3 +1,4 @@
+
 export enum AppView {
   DASHBOARD = 'dashboard',
   EDITOR = 'editor',
@@ -26,6 +27,19 @@ export enum InjectionMethod {
   NtCreateThreadEx = 4,
   LoadLibraryA = 5,
   LD_PRELOAD = 6
+}
+
+export enum InjectionErrorCode {
+  SUCCESS = 0,
+  DLL_NOT_FOUND = 1,
+  PROCESS_NOT_FOUND = 2,
+  ACCESS_DENIED = 3,
+  MEMORY_ALLOCATION_FAILED = 4,
+  WRITE_MEMORY_FAILED = 5,
+  MODULE_HANDLE_FAILED = 6,
+  THREAD_CREATION_FAILED = 7,
+  UNSUPPORTED_PLATFORM = 8,
+  UNKNOWN_ERROR = 99
 }
 
 export interface ProcessInfo {
@@ -140,6 +154,7 @@ export interface InjectionConfig {
 
 export interface InjectionResult {
   success: boolean;
+  code: InjectionErrorCode;
   pid?: number;
   error?: string;
   log?: string[];
@@ -153,7 +168,7 @@ export interface FluxAPI {
   onPhaseUpdate: (callback: (phase: number) => void) => void;
   
   inject(config: InjectionConfig): Promise<InjectionResult>;
-  inject(pid: number, dllPath: string, settings: AppSettings): Promise<{ success: boolean; error?: string }>;
+  inject(pid: number, dllPath: string, settings: AppSettings): Promise<InjectionResult>;
 
   selectFile: () => Promise<string | null>;
 
@@ -164,7 +179,6 @@ export interface FluxAPI {
   saveSettings: (settings: AppSettings) => Promise<boolean>;
   loadSettings: () => Promise<AppSettings | null>;
 
-  // Fix: Add missing methods for watchdog and target monitoring
   startWatchdog: (pid: number) => void;
   onTargetDied: (callback: (pid: number) => void) => void;
 }

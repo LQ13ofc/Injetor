@@ -1,6 +1,7 @@
 import fs from 'fs';
 import net from 'net';
 import path from 'path';
+import { InjectionErrorCode } from '../../src/types';
 
 // Permissions & Access Masks
 const INJECTION_ACCESS_MASK = 0x043A; // PROCESS_CREATE_THREAD | VM_OPERATION | VM_WRITE | VM_READ | QUERY_INFORMATION
@@ -14,6 +15,11 @@ const TH32CS_SNAPPROCESS = 0x00000002;
 const SE_PRIVILEGE_ENABLED = 2;
 const TOKEN_ADJUST_PRIVILEGES = 0x0020;
 const TOKEN_QUERY = 0x0008;
+
+// Config Constants
+const PIPE_NAME = '\\\\.\\pipe\\NexusEnginePipe';
+const IPC_TOKEN = "FLUX_SEC_TOKEN_V1";
+const IGNORED_PROCESSES = new Set(['svchost.exe', 'conhost.exe', 'System', 'Idle', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe', 'lsass.exe', 'fontdrvhost.exe', 'Memory Compression']);
 
 export class InjectorService {
   private nativeAvailable = false;
@@ -32,6 +38,7 @@ export class InjectorService {
   private GetModuleHandleA: any;
   private GetProcAddress: any;
   private CloseHandle: any;
+  private CreateRemoteThread: any; // Fallback
   private NtCreateThreadEx: any;
   private CreateToolhelp32Snapshot: any;
   private Process32First: any;
@@ -49,17 +56,18 @@ export class InjectorService {
   private LuidType: any;
 
   constructor() {
-    try {
-      // @ts-ignore
-      this.koffi = require('koffi');
-      if (process.platform === 'win32') {
+    if (process.platform === 'win32') {
+      try {
+        // @ts-ignore
+        this.koffi = require('koffi');
         this.nativeAvailable = true;
-        // Lazy loading is good, but we initialize definitions here for stability
         this.loadNativeFunctions();
         this.setDebugPrivilege();
+      } catch (e) {
+        console.warn("Native components (koffi) failed to load. Injection will fail.", e);
       }
-    } catch (e) {
-      console.warn("Native components (koffi) failed to load. Injection will fail.");
+    } else {
+      console.warn("InjectorService: Non-Windows platform detected. Native features disabled.");
     }
   }
 
@@ -77,6 +85,9 @@ export class InjectorService {
     this.GetProcAddress = this.kernel32.func('__stdcall', 'GetProcAddress', 'int', ['int', 'str']);
     this.CloseHandle = this.kernel32.func('__stdcall', 'CloseHandle', 'int', ['int']);
     this.GetCurrentProcess = this.kernel32.func('__stdcall', 'GetCurrentProcess', 'int', []);
+    
+    // Fallback Method
+    this.CreateRemoteThread = this.kernel32.func('__stdcall', 'CreateRemoteThread', 'int', ['int', 'ptr', 'int', 'ptr', 'ptr', 'uint32', 'out uint32']);
 
     // Snapshot
     this.ProcessEntry32Type = this.koffi.struct('PROCESSENTRY32', {
@@ -133,6 +144,7 @@ export class InjectorService {
 
   async checkProcessAlive(pid: number): Promise<boolean> {
     try {
+      if (!this.nativeAvailable) return false;
       process.kill(pid, 0);
       return true;
     } catch (e) {
@@ -148,70 +160,88 @@ export class InjectorService {
         const hSnapshot = this.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if (hSnapshot === -1) { resolve([]); return; }
 
-        const entry = { dwSize: this.koffi.sizeof(this.ProcessEntry32Type) };
-        let success = this.Process32First(hSnapshot, entry);
-        
-        const IGNORED_PROCESSES = ['svchost.exe', 'conhost.exe', 'System', 'Idle', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe', 'lsass.exe'];
-
-        while (success) {
-            const name = (entry as any).szExeFile; 
-            const pid = (entry as any).th32ProcessID;
+        try {
+            const entry = { dwSize: this.koffi.sizeof(this.ProcessEntry32Type) };
+            let success = this.Process32First(hSnapshot, entry);
             
-            // Optimization: Filter system processes early to save IPC bandwidth
-            if (pid > 4 && !IGNORED_PROCESSES.includes(name)) {
-                 list.push({ name: name, pid: pid, title: name });
+            while (success) {
+                const name = (entry as any).szExeFile; 
+                const pid = (entry as any).th32ProcessID;
+                
+                // Optimized Filtering: Don't push system processes to array
+                if (pid > 4 && !IGNORED_PROCESSES.has(name)) {
+                     list.push({ name: name, pid: pid, title: name });
+                }
+                success = this.Process32Next(hSnapshot, entry);
             }
-            success = this.Process32Next(hSnapshot, entry);
+        } finally {
+            this.CloseHandle(hSnapshot);
         }
-
-        this.CloseHandle(hSnapshot);
         resolve(list);
     });
   }
 
   async inject(pid: number, dllPath: string, settings: any) {
-    if (!fs.existsSync(dllPath)) return { success: false, error: "DLL not found on disk." };
-    if (!this.nativeAvailable) return { success: false, error: "Native engine unavailable." };
+    if (process.platform !== 'win32') return { success: false, code: InjectionErrorCode.UNSUPPORTED_PLATFORM, error: "Windows only." };
+    if (!fs.existsSync(dllPath)) return { success: false, code: InjectionErrorCode.DLL_NOT_FOUND, error: "DLL not found on disk." };
+    if (!this.nativeAvailable) return { success: false, code: InjectionErrorCode.UNKNOWN_ERROR, error: "Native engine unavailable." };
+
+    let hProcess = 0;
+    let pRemoteMem = 0;
+    let hThreadHandle = 0;
 
     try {
-        const hProcess = this.OpenProcess(INJECTION_ACCESS_MASK, 0, pid);
-        if (!hProcess) return { success: false, error: "OpenProcess Failed (Access Denied). Anti-Cheat active?" };
+        hProcess = this.OpenProcess(INJECTION_ACCESS_MASK, 0, pid);
+        if (!hProcess) return { success: false, code: InjectionErrorCode.ACCESS_DENIED, error: "Access Denied. Check Anti-Virus." };
 
         const pathLen = dllPath.length + 1;
-        const pRemoteMem = this.VirtualAllocEx(hProcess, 0, pathLen, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!pRemoteMem) { this.CloseHandle(hProcess); return { success: false, error: "VirtualAllocEx failed" }; }
+        pRemoteMem = this.VirtualAllocEx(hProcess, 0, pathLen, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (!pRemoteMem) return { success: false, code: InjectionErrorCode.MEMORY_ALLOCATION_FAILED, error: "VirtualAllocEx failed" };
 
         const written = [0];
         if (!this.WriteProcessMemory(hProcess, pRemoteMem, dllPath, pathLen, written)) {
-            this.CloseHandle(hProcess); return { success: false, error: "WriteProcessMemory failed" };
+            return { success: false, code: InjectionErrorCode.WRITE_MEMORY_FAILED, error: "WriteProcessMemory failed" };
         }
 
         const hKernel32 = this.GetModuleHandleA("kernel32.dll");
         const pLoadLibrary = this.GetProcAddress(hKernel32, "LoadLibraryA");
-        if (!pLoadLibrary) { this.CloseHandle(hProcess); return { success: false, error: "GetProcAddress failed" }; }
+        if (!pLoadLibrary) return { success: false, code: InjectionErrorCode.MODULE_HANDLE_FAILED, error: "GetProcAddress failed" };
 
+        // Strategy: Try NtCreateThreadEx (Stealth), Fallback to CreateRemoteThread
         const hThreadBuffer = [0];
-        const status = this.NtCreateThreadEx(hThreadBuffer, THREAD_ALL_ACCESS, null, hProcess, pLoadLibrary, pRemoteMem, 0, 0, 0, 0, null);
+        let status = -1;
 
-        if (status >= 0) {
-            if (hThreadBuffer[0]) this.CloseHandle(hThreadBuffer[0]);
-            this.CloseHandle(hProcess);
-            return { success: true };
-        } else {
-            this.CloseHandle(hProcess);
-            return { success: false, error: `NtCreateThreadEx failed: 0x${(status >>> 0).toString(16).toUpperCase()}` };
+        if (settings.stealthMode) {
+             status = this.NtCreateThreadEx(hThreadBuffer, THREAD_ALL_ACCESS, null, hProcess, pLoadLibrary, pRemoteMem, 0, 0, 0, 0, null);
+             if (status >= 0) hThreadHandle = hThreadBuffer[0];
         }
+
+        // Fallback or explicit standard injection
+        if (status < 0 || !settings.stealthMode) {
+            hThreadHandle = this.CreateRemoteThread(hProcess, null, 0, pLoadLibrary, pRemoteMem, 0, null);
+        }
+
+        if (hThreadHandle) {
+            return { success: true, code: InjectionErrorCode.SUCCESS };
+        } else {
+            return { success: false, code: InjectionErrorCode.THREAD_CREATION_FAILED, error: "All thread creation methods failed." };
+        }
+
     } catch (e: any) {
-        return { success: false, error: `Exception: ${e.message}` };
+        return { success: false, code: InjectionErrorCode.UNKNOWN_ERROR, error: `Exception: ${e.message}` };
+    } finally {
+        if (hThreadHandle) this.CloseHandle(hThreadHandle);
+        if (hProcess) this.CloseHandle(hProcess);
+        // Note: We deliberately do not free pRemoteMem immediately as LoadLibrary needs to read it. 
+        // In a production cheat, you would cleanup after a delay or via a shellcode stub.
     }
   }
 
   async executeScript(code: string): Promise<{ success: boolean; error?: string }> {
-    const pipeName = process.platform === 'win32' ? '\\\\.\\pipe\\NexusEnginePipe' : '/tmp/NexusEnginePipe';
-    const IPC_TOKEN = "FLUX_SEC_TOKEN_V1"; // Security Token
+    if (process.platform !== 'win32') return { success: false, error: "Not supported on this OS" };
     
     return new Promise((resolve) => {
-      const client = net.createConnection(pipeName, () => {
+      const client = net.createConnection(PIPE_NAME, () => {
         // Send token + code
         const payload = JSON.stringify({ token: IPC_TOKEN, script: code });
         client.write(payload, (err) => {
@@ -220,7 +250,7 @@ export class InjectorService {
           else resolve({ success: true });
         });
       });
-      client.on('error', () => resolve({ success: false, error: "IPC Connection Failed. Inject the DLL first." }));
+      client.on('error', () => resolve({ success: false, error: "IPC Connection Failed. DLL not injected?" }));
     });
   }
 }

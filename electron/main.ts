@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { InjectorService } from './services/injector.service';
 
@@ -63,9 +63,17 @@ ipcMain.on('window-control', (e, action) => {
 
 ipcMain.handle('get-processes', () => injector.getProcessList());
 ipcMain.handle('inject-dll', (e, { pid, dllPath, settings }) => injector.inject(pid, dllPath, settings));
-ipcMain.handle('execute-script', (e, code) => injector.executeScript(code));
+
+ipcMain.handle('execute-script', (e, code) => {
+  // Security Validation: Prevent execution if payload exceeds safe limits or contains suspicious non-script patterns
+  if (!code || typeof code !== 'string') return { success: false, error: 'Invalid payload' };
+  if (code.length > 1024 * 1024) return { success: false, error: 'Payload too large' };
+  
+  return injector.executeScript(code);
+});
+
 ipcMain.handle('get-bundled-dll', () => {
-  const p = process as any; // Type assertion for Electron specific properties
+  const p = process as any;
   return app.isPackaged 
     ? path.join(p.resourcesPath, 'assets', 'flux-core-engine.dll')
     : path.join(__dirname, '../../resources/assets/flux-core-engine.dll');

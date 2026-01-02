@@ -1,22 +1,15 @@
 import React from 'react';
 import { Settings, Zap, FolderOpen, Target, Cpu } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { InjectionMethod } from '../../types';
+import { InjectionMethod, InjectionErrorCode } from '../../types';
 
 const ConfigurationPanel: React.FC = () => {
   const { stats, setStats, settings, setSettings, addLog } = useApp();
   const [isInjecting, setIsInjecting] = React.useState(false);
 
-  // Helper para mapear stats para o formato antigo se necessário, ou usar direto
   const processName = stats.target.process?.name || "";
   const dllPath = stats.target.dllPath || "";
   const status = stats.processStatus;
-
-  const handleSelectDLL = async () => {
-      // Simulação para manter compatibilidade, já que selectFile foi removido do preload
-      // Em produção, isso usaria dialog.showOpenDialog no main process
-      addLog('DLL selection managed automatically by GamePack definitions.', 'WARN');
-  };
 
   const handleInject = async () => {
     if (!stats.target.process) {
@@ -29,7 +22,6 @@ const ConfigurationPanel: React.FC = () => {
     addLog(`Starting injection sequence for ${processName}...`, 'INFO');
     
     try {
-        // Usamos o PID direto do processo selecionado
         const result = await window.fluxAPI.inject(stats.target.process.pid, dllPath, settings);
 
         if (result.success) {
@@ -37,7 +29,9 @@ const ConfigurationPanel: React.FC = () => {
             addLog(`Injection Successful!`, 'SUCCESS');
         } else {
             setStats(prev => ({...prev, processStatus: 'ERROR'}));
-            addLog(`Injection Failed: ${result.error}`, 'ERROR');
+            let userMsg = result.error;
+            if(result.code === InjectionErrorCode.ACCESS_DENIED) userMsg = "Access Denied: Try running as Administrator.";
+            addLog(`Injection Failed: ${userMsg}`, 'ERROR');
         }
     } catch (e: any) {
         setStats(prev => ({...prev, processStatus: 'ERROR'}));
