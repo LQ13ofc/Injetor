@@ -9,7 +9,7 @@ const INJECTION_ACCESS_MASK = 0x043A;
 // Memory Constants
 const MEM_COMMIT = 0x1000;
 const MEM_RESERVE = 0x2000;
-const PAGE_EXECUTE_READWRITE = 0x40;
+const PAGE_READWRITE = 0x04; // Changed from PAGE_EXECUTE_READWRITE (0x40) for stealth. String path doesn't need execution rights.
 const THREAD_ALL_ACCESS = 0x1F0FFF;
 const TH32CS_SNAPPROCESS = 0x00000002;
 
@@ -119,16 +119,17 @@ export class InjectorService {
             return;
         }
 
-        const entry = {};
-        // Initialize dwSize is critical for Windows API
-        // 296 is typical size for x86, typically we let koffi handle sizing if we initialize the struct buffer
-        // But simpler to just rely on koffi decoding
+        // CRITICAL FIX: Initialize dwSize. Windows API requires this to be set to the struct size
+        // before calling Process32First, otherwise it returns invalid parameter error.
+        const entry = {
+            dwSize: this.koffi.sizeof(this.ProcessEntry32Type)
+        };
         
         let success = this.Process32First(hSnapshot, entry);
         
         while (success) {
             // Koffi automatically decodes the struct into 'entry' object
-            const name = (entry as any).szExeFile; // null-terminated string logic handled by koffi usually
+            const name = (entry as any).szExeFile; 
             const pid = (entry as any).th32ProcessID;
             
             // Basic filtering to reduce noise
@@ -158,8 +159,11 @@ export class InjectorService {
         if (!hProcess) return { success: false, error: "OpenProcess Failed (Access Denied)" };
 
         // 2. Alloc Memory
+        // CRITICAL FIX: Use PAGE_READWRITE (0x04) instead of PAGE_EXECUTE_READWRITE (0x40).
+        // Writing a string path does not require execution privileges. 
+        // RWX memory is a major detection vector.
         const pathLen = dllPath.length + 1;
-        const pRemoteMem = this.VirtualAllocEx(hProcess, 0, pathLen, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        const pRemoteMem = this.VirtualAllocEx(hProcess, 0, pathLen, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         
         if (!pRemoteMem) {
             this.CloseHandle(hProcess);

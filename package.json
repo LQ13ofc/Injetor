@@ -9,6 +9,7 @@
     "dev:vite": "vite",
     "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
     "build": "npm run clean && npm run type-check && npm run build:renderer && npm run build:electron && npm run package",
+    "build:auto": "npm run build",
     "clean": "rimraf dist release",
     "type-check": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "build:renderer": "vite build",
