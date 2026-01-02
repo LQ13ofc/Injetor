@@ -1,6 +1,6 @@
 import React from 'react';
 import { Settings, Zap, FolderOpen, Target, Cpu } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { InjectionMethod } from '../../types';
 
 const ConfigurationPanel: React.FC = () => {

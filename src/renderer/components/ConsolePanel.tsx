@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Terminal } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../context/AppContext';
 
 const ConsolePanel: React.FC = () => {
   const { logs } = useApp();
